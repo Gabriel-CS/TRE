@@ -10,3 +10,7 @@
 /data/raw/perfil_eleitor_secao_2018_SE.csv
 municipio_tse_ibge.zip
 /.pyre
+# Ignorar a pasta de dados brutos e logs das urnas
+data/raw/
+*.dat
+*.logjez
