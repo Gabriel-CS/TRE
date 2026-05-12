@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
 
-from analysis import (
+from src.analysis import (
     UrnasCriticasAnalysis,
     URN_MODELS,
     OKABE_ITO,
@@ -20,11 +20,11 @@ from analysis import (
 DATA_CONFIG = {
     "2022": {
         "consolidado": "data/output/2022_1t_SE_urnas_consolidado.zip",
-        "completas":   "data/data_aux_zip/urnas_completas_2022_1t.zip",
+        "completas":   "data/output/urnas_completas_2022_1t.zip",
     },
     "2018": {
         "consolidado": "data/output/2018_1t_SE_urnas_consolidado.zip",
-        "completas":   "data/data_aux_zip/urnas_completas_2018_1t.zip",
+        "completas":   "data/output/urnas_completas_2018_1t.zip",
     },
 }
 
