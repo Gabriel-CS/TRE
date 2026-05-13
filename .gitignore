@@ -12,5 +12,10 @@
 #/.pyre
 # Ignorar a pasta de dados brutos e logs das urnas
 #data/raw/
+venv/
 *.dat
 *.logjez
+.gitignore
+.gitattributes
+.vscode/
+src/__pycache__/
