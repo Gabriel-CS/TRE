@@ -2,3 +2,7 @@ pandas
 numpy
 streamlit
 plotly
+geopandas
+matplotlib
+folium
+streamlit_folium
