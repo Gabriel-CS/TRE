@@ -19,7 +19,7 @@ STATUS_LABELS: dict[int, str] = {
     1: "Normal",
     2: "Atenção",
     3: "Crítico",
-    4: "Emergência",
+    4: "Super Crítica",
 }
 
 

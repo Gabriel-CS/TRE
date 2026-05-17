@@ -1,9 +1,3 @@
-"""
-src/tab_modelo.py
-─────────────────────────────────────────────────────────────────────────────
-Renderização completa da aba "Análise por Modelo de Urna".
-Delega todos os cálculos à instância de UrnasCriticasAnalysis recebida.
-"""
 from __future__ import annotations
 
 import gc

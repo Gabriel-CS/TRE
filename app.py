@@ -1,4 +1,3 @@
-# app.py
 import gc
 import os
 
@@ -72,7 +71,7 @@ STATUS_COLORS: dict[int, str] = {
     1: "#28a745",   # Normal
     2: "#ffc107",   # Atenção
     3: "#dc3545",   # Crítico
-    4: "#6f1d1b",   # Emergência
+    4: "#6f1d1b",   # Super Crítica
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -90,90 +89,124 @@ st.set_page_config(
 # ═══════════════════════════════════════════════════════════════════════════════
 st.markdown("""
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
         html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
-        .main-header { font-weight: 700; color: #1a1a2e; letter-spacing: -0.02em;
-                       margin-bottom: 0.25rem; font-size: 1.6rem; }
-        .sub-header  { color: #6c757d; font-size: 1rem; margin-top: -0.25rem; margin-bottom: 1.25rem; }
+        /* ── Header principal ─────────────────────────────────────────── */
+        .main-header {
+            font-weight: 800; color: #0f172a; letter-spacing: -0.03em;
+            margin-bottom: 0.15rem; font-size: 1.65rem; line-height: 1.2;
+        }
+        .sub-header {
+            color: #64748b; font-size: 0.9rem; margin-top: 0; margin-bottom: 1.25rem;
+            font-weight: 400; letter-spacing: 0.01em;
+        }
 
-        .kpi-box { background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-                   border: 1px solid #e9ecef; border-radius: 12px; padding: 1.25rem;
-                   text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-                   transition: transform 0.2s ease, box-shadow 0.2s ease; height: 100%; }
-        .kpi-box:hover  { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-        .kpi-label      { font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
-                          letter-spacing: 0.08em; color: #adb5bd; margin-bottom: 0.5rem; }
-        .kpi-value      { font-size: 1.6rem; font-weight: 700; color: #212529; line-height: 1.2; }
+        /* ── KPI cards ────────────────────────────────────────────────── */
+        .kpi-box {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 1.25rem 1rem;
+            text-align: center;
+            box-shadow: 0 1px 4px rgba(15,23,42,0.05), 0 4px 16px rgba(15,23,42,0.04);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+        .kpi-box::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #0072B2, #56B4E9);
+            border-radius: 14px 14px 0 0;
+        }
+        .kpi-box:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(15,23,42,0.10); }
+        .kpi-label {
+            font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.1em; color: #94a3b8; margin-bottom: 0.5rem;
+        }
+        .kpi-value      { font-size: 1.65rem; font-weight: 800; color: #0f172a; line-height: 1.15; }
         .kpi-accent     { color: #0072B2; }
-        .kpi-danger     { color: #D55E00; }
-        .kpi-success    { color: #009E73; }
+        .kpi-danger     { color: #dc2626; }
+        .kpi-success    { color: #059669; }
 
-        .section-header { border-left: 4px solid #1a1a2e; padding-left: 12px;
-                          margin: 1.5rem 0 0.75rem 0; }
-        .section-header h2 { margin: 0; font-size: 1.15rem; font-weight: 600; color: #1a1a2e; }
-        .section-desc { font-size: 0.85rem; color: #6c757d; margin-bottom: 1rem; padding-left: 16px; }
-
-        .folium-map { border-radius: 12px; overflow: hidden;
-                      box-shadow: 0 4px 16px rgba(0,0,0,0.08); border: 1px solid #e9ecef; }
-
-        .resumo-card { border: 1px solid #e9ecef; border-radius: 8px; padding: 8px 12px;
-                       margin-bottom: 6px; background: white; display: flex;
-                       align-items: center; justify-content: space-between;
-                       gap: 10px; transition: background 0.15s; }
-        .resumo-card:hover       { background: #f8f9fa; }
-        .resumo-dot              { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-        .resumo-nome             { font-size: 0.8rem; font-weight: 600; color: #1a1a2e; }
-        .resumo-metrica-valor    { font-size: 0.82rem; font-weight: 700; color: #333;
-                                   font-family: 'SF Mono', Monaco, monospace; }
-        .resumo-metrica-label    { font-size: 0.6rem; color: #adb5bd;
-                                   text-transform: uppercase; letter-spacing: 0.3px; }
-
-        .alert-box     { padding: 1rem 1.25rem; border-radius: 8px; border-left: 4px solid; margin-bottom: 1rem; }
-        .alert-danger  { background: #f8d7da; border-color: #dc3545; color: #721c24; }
-        .alert-success { background: #d4edda; border-color: #28a745; color: #155724; }
-        .alert-warning { background: #fff3cd; border-color: #ffc107; color: #856404; }
-
-        .status-badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 4px;
-                        font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
-                        letter-spacing: 0.05em; }
-        .status-1 { background: #d4edda; color: #155724; }
-        .status-2 { background: #fff3cd; color: #856404; }
-        .status-3 { background: #f8d7da; color: #721c24; }
-        .status-4 { background: #f5c6cb; color: #721c24; }
-
-        .footer { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid #e9ecef;
-                  text-align: center; color: #adb5bd; font-size: 0.8rem; }
-
-        .stTabs [data-baseweb="tab-list"] { gap: 8px; }
-        .stTabs [data-baseweb="tab"] { padding: 10px 20px; font-weight: 500; font-size: 0.9rem;
-                                       border-radius: 8px 8px 0 0; color: #6c757d; }
-        .stTabs [aria-selected="true"] { background: #1a1a2e !important; color: white !important; }
-
-        /* ═════════════════════════════════════════════════════════════════
-           Melhoria 5 — Botao de informacao estilizado (popover nativo)
-           ═════════════════════════════════════════════════════════════════ */
-        [data-testid="stPopoverButton"] > button {
-            border-radius: 50% !important;
-            width: 24px !important; height: 24px !important;
-            min-width: 24px !important; min-height: 24px !important;
-            padding: 0 !important; margin: 0 !important;
-            background: #e9ecef !important; color: #6c757d !important;
-            font-size: 12px !important; font-weight: 700 !important;
-            border: 1px solid #ced4da !important;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
-            transition: all 0.2s ease !important;
-            display: inline-flex !important; align-items: center !important;
-            justify-content: center !important; line-height: 1 !important;
+        /* ── Seções ───────────────────────────────────────────────────── */
+        .section-header {
+            border-left: 4px solid #0072B2;
+            padding-left: 12px;
+            margin: 1.75rem 0 0.6rem 0;
         }
-        [data-testid="stPopoverButton"] > button:hover {
-            background: #1a1a2e !important; color: white !important;
-            border-color: #1a1a2e !important;
-            box-shadow: 0 2px 6px rgba(26,26,46,0.25) !important;
-            transform: scale(1.1);
+        .section-header h2 {
+            margin: 0; font-size: 1.05rem; font-weight: 700; color: #0f172a;
+            letter-spacing: -0.01em;
         }
-        [data-testid="stPopoverButton"] {
-            padding: 0 !important; margin: 0 !important;
+        .section-desc {
+            font-size: 0.82rem; color: #64748b; margin-bottom: 1rem;
+            padding-left: 16px; line-height: 1.5;
+        }
+
+        /* ── Mapa ─────────────────────────────────────────────────────── */
+        .folium-map {
+            border-radius: 14px; overflow: hidden;
+            box-shadow: 0 4px 20px rgba(15,23,42,0.10);
+            border: 1px solid #e2e8f0;
+        }
+
+        /* ── Resumo cards ─────────────────────────────────────────────── */
+        .resumo-card {
+            border: 1px solid #f1f5f9; border-radius: 10px; padding: 8px 14px;
+            margin-bottom: 6px; background: #fafafa;
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 10px; transition: background 0.15s, border-color 0.15s;
+        }
+        .resumo-card:hover       { background: #f0f9ff; border-color: #bae6fd; }
+        .resumo-dot              { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+        .resumo-nome             { font-size: 0.8rem; font-weight: 600; color: #0f172a; }
+        .resumo-metrica-valor    {
+            font-size: 0.82rem; font-weight: 700; color: #1e293b;
+            font-family: 'SF Mono', 'Fira Code', Monaco, monospace;
+        }
+        .resumo-metrica-label    {
+            font-size: 0.6rem; color: #94a3b8;
+            text-transform: uppercase; letter-spacing: 0.3px;
+        }
+
+        /* ── Alertas ──────────────────────────────────────────────────── */
+        .alert-box     { padding: 1rem 1.25rem; border-radius: 10px; border-left: 4px solid; margin-bottom: 1rem; }
+        .alert-danger  { background: #fef2f2; border-color: #dc2626; color: #991b1b; }
+        .alert-success { background: #f0fdf4; border-color: #16a34a; color: #15803d; }
+        .alert-warning { background: #fffbeb; border-color: #d97706; color: #92400e; }
+
+        /* ── Status badges ────────────────────────────────────────────── */
+        .status-badge {
+            display: inline-block; padding: 0.2rem 0.65rem; border-radius: 20px;
+            font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+        .status-0 { background: #e0f2fe; color: #0369a1; }
+        .status-1 { background: #dcfce7; color: #15803d; }
+        .status-2 { background: #fef9c3; color: #a16207; }
+        .status-3 { background: #fee2e2; color: #991b1b; }
+        .status-4 { background: #f5e6e6; color: #6f1d1b; }
+
+        /* ── Footer ───────────────────────────────────────────────────── */
+        .footer {
+            margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid #f1f5f9;
+            text-align: center; color: #94a3b8; font-size: 0.78rem;
+        }
+
+        /* ── Tabs ─────────────────────────────────────────────────────── */
+        .stTabs [data-baseweb="tab-list"] { gap: 6px; }
+        .stTabs [data-baseweb="tab"] {
+            padding: 9px 22px; font-weight: 600; font-size: 0.85rem;
+            border-radius: 8px 8px 0 0; color: #64748b;
+            letter-spacing: 0.01em;
+        }
+        .stTabs [aria-selected="true"] {
+            background: #0f172a !important; color: white !important;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -259,10 +292,11 @@ with fil_col2:
     with col_status:
         status_opcoes = {
             "Todas as críticas": None,
+            "0 — Sem Atraso":         0,
             "1 — Normal":             1,
             "2 — Atenção":            2,
             "3 — Crítico":            3,
-            "4 — Emergência":         4,
+            "4 — Super Crítica":      4,
         }
 
         status_label = st.selectbox(
@@ -272,29 +306,156 @@ with fil_col2:
         status_filter = status_opcoes[status_label]
 
     with col_info_btn:
-        # Alinha o botão verticalmente com o dropdown
         st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
 
-        # Botao de informacao estilizado — popover nativo do Streamlit com CSS customizado
-        with st.popover("i", use_container_width=False):
-            for lvl, label in STATUS_LABELS.items():
-                cor = STATUS_COLORS[lvl]
-                desc = {
-                    0: "Secoes sem atraso significativo na fila. Operacao fluida dentro dos parametros esperados.",
-                    1: "Atraso leve e pontual na fila, dentro da margem de tolerancia operacional.",
-                    2: "Atraso moderado na fila que causou pequenas interrupcoes no fluxo de votacao.",
-                    3: "Atraso consideravel na fila, impactando significativamente o tempo de espera dos eleitores.",
-                    4: "Atraso severo e prolongado na fila. Situacao critica que demandou intervencao imediata.",
-                }[lvl]
-                st.markdown(f"""
-                    <div style="border-left:3px solid {cor};background:linear-gradient(90deg,{cor}10 0%,#fff 100%);padding:6px 8px;border-radius:0 6px 6px 0;margin-bottom:6px;">
-                        <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
-                            <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:{cor};color:white;font-size:10px;font-weight:700;">{lvl}</span>
-                            <span style="font-size:13px;font-weight:600;color:#1a1a2e;">{label}</span>
-                        </div>
-                        <div style="font-size:11px;color:#495057;line-height:1.4;padding-left:24px;">{desc}</div>
-                    </div>
-                """, unsafe_allow_html=True)
+        import streamlit.components.v1 as _components
+
+        _STATUS_DESC = {
+            0: ("Operação fluida, sem atraso significativo.",          "#17a2b8", "✔"),
+            1: ("Atraso leve dentro da margem de tolerância.",         "#28a745", "↑"),
+            2: ("Atraso moderado com pequenas interrupções no fluxo.", "#ffc107", "⚠"),
+            3: ("Atraso considerável com impacto no tempo de espera.", "#dc3545", "✖"),
+            4: ("Atraso severo. Intervenção necessária.",              "#6f1d1b", "‼"),
+        }
+
+        _items_html = ""
+        for lvl, label in STATUS_LABELS.items():
+            cor  = _STATUS_DESC[lvl][1]
+            icon = _STATUS_DESC[lvl][2]
+            desc = _STATUS_DESC[lvl][0]
+            _items_html += (
+                f'<div style="display:flex;gap:9px;align-items:flex-start;margin-bottom:9px;">'
+                f'  <div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;'
+                f'              background:{cor};color:white;font-size:11px;font-weight:800;'
+                f'              display:flex;align-items:center;justify-content:center;">{lvl}</div>'
+                f'  <div>'
+                f'    <div style="font-size:12px;font-weight:700;color:{cor};margin-bottom:2px;">{icon}&nbsp;{label}</div>'
+                f'    <div style="font-size:11px;color:#6b7280;line-height:1.4;">{desc}</div>'
+                f'  </div>'
+                f'</div>'
+            )
+
+        _components.html(f"""<!DOCTYPE html>
+<html><head>
+<style>
+  *{{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif;}}
+  body{{background:transparent;overflow:visible;}}
+  #btn{{
+    width:28px;height:28px;border-radius:50%;
+    background:#ffffff;color:#0f172a;
+    font-size:13px;font-weight:800;line-height:28px;
+    text-align:center;cursor:pointer;user-select:none;
+    box-shadow:0 2px 8px rgba(15,23,42,0.15);
+    transition:background .18s,box-shadow .18s;
+    display:inline-block;border:none;outline:none;
+    border:1.5px solid #e2e8f0;
+  }}
+  #btn:hover{{background:#f1f5f9;box-shadow:0 4px 14px rgba(15,23,42,0.12);}}
+  #panel{{
+    position:fixed;
+    background:#fff;border:1px solid #e2e8f0;border-radius:12px;
+    padding:14px 14px 10px;
+    box-shadow:0 12px 40px rgba(15,23,42,0.18);
+    width:272px;z-index:2147483647;
+    opacity:0;
+    transform:translateY(-6px);
+    transition:opacity .25s ease, transform .25s ease;
+    pointer-events:none;
+  }}
+  #panel.visible{{
+    opacity:1;
+    transform:translateY(0);
+    pointer-events:auto;
+  }}
+  #title{{
+    font-size:10px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.1em;color:#94a3b8;
+    padding-bottom:8px;margin-bottom:10px;
+    border-bottom:1px solid #f1f5f9;
+  }}
+  #bar{{height:3px;background:#e2e8f0;border-radius:2px;margin-top:10px;overflow:hidden;}}
+  #bar-fill{{height:100%;width:100%;background:#0072B2;border-radius:2px;transition:width 3s linear;}}
+</style>
+</head><body>
+<div id="btn">?</div>
+<script>
+  var btn   = document.getElementById('btn');
+  var timer = null;
+  var pDoc, panel, fill;
+
+  // Cria o painel diretamente no documento pai para ficar acima de todo conteúdo Streamlit
+  pDoc  = window.parent.document;
+  panel = pDoc.createElement('div');
+  panel.id = 'crit-panel-legend';
+  panel.innerHTML = `
+    <div id="crit-title" style="font-size:10px;font-weight:700;text-transform:uppercase;
+      letter-spacing:.1em;color:#94a3b8;padding-bottom:8px;margin-bottom:10px;
+      border-bottom:1px solid #f1f5f9;font-family:Inter,sans-serif;">Níveis de Criticidade</div>
+    {_items_html}
+    <div style="height:3px;background:#e2e8f0;border-radius:2px;margin-top:10px;overflow:hidden;">
+      <div id="crit-bar" style="height:100%;width:100%;background:#0072B2;border-radius:2px;
+        transition:width 3s linear;"></div>
+    </div>`;
+
+  Object.assign(panel.style, {{
+    position:'fixed', zIndex:'2147483647',
+    background:'#fff', border:'1px solid #e2e8f0', borderRadius:'12px',
+    padding:'14px 14px 10px', width:'272px',
+    boxShadow:'0 12px 40px rgba(15,23,42,0.18)',
+    fontFamily:'Inter,sans-serif',
+    opacity:'0', transform:'translateY(-8px)',
+    transition:'opacity .28s ease, transform .28s ease',
+    pointerEvents:'none', display:'none'
+  }});
+
+  pDoc.body.appendChild(panel);
+  fill = pDoc.getElementById('crit-bar');
+
+  function showPanel() {{
+    var frame = window.frameElement;
+    var fr    = frame.getBoundingClientRect();
+    var br    = btn.getBoundingClientRect();
+    panel.style.display = 'block';
+    panel.style.left    = (fr.left + br.left) + 'px';
+    panel.style.top     = (fr.top  + br.bottom + 8) + 'px';
+
+    // Força reflow para a transição funcionar a partir do estado inicial
+    panel.getBoundingClientRect();
+    panel.style.opacity       = '1';
+    panel.style.transform     = 'translateY(0)';
+    panel.style.pointerEvents = 'auto';
+
+    // Barra de progresso
+    fill.style.transition = 'none';
+    fill.style.width      = '100%';
+    requestAnimationFrame(function() {{
+      requestAnimationFrame(function() {{
+        fill.style.transition = 'width 3s linear';
+        fill.style.width      = '0%';
+      }});
+    }});
+
+    clearTimeout(timer);
+    timer = setTimeout(hidePanel, 3000);
+  }}
+
+  function hidePanel() {{
+    panel.style.opacity       = '0';
+    panel.style.transform     = 'translateY(-8px)';
+    panel.style.pointerEvents = 'none';
+    setTimeout(function() {{ panel.style.display = 'none'; }}, 280);
+  }}
+
+  btn.addEventListener('click', function() {{
+    if (panel.style.display === 'none' || panel.style.opacity === '0') {{
+      showPanel();
+    }} else {{
+      clearTimeout(timer);
+      hidePanel();
+    }}
+  }});
+</script>
+</body></html>""", height=36, scrolling=False)
 
 if 'last_ano' not in st.session_state:
     st.session_state['last_ano'] = ano_selecionado
@@ -334,13 +495,10 @@ with st.spinner("Carregando dados..."):
     # 2. Log de votantes do nível selecionado (métricas operacionais por modelo de urna)
     df_voter_log = _load_csv_cached(modelo_path)
 
-    # 3. Total global de seções
-    # NOTA: nível 0 (Sem Atraso) removido do filtro. Se precisar voltar:
-    # n0_path      = cfg["niveis"][_nivel_key(0)]
-    # total_n0     = _count_rows(n0_path)     if os.path.exists(n0_path)    else 0
+    # 3. Total global de seções (inclui nível 0 — Sem Atraso — agora disponível no filtro)
     n_all_path   = cfg["niveis"][_nivel_key(None)]
-    total_crit   = _count_rows(n_all_path)  if os.path.exists(n_all_path) else 0
-    total_secoes_global = total_crit  # + total_n0  (comentado: n0 removido)
+    total_crit   = _count_rows(n_all_path) if os.path.exists(n_all_path) else 0
+    total_secoes_global = total_crit
 
     # 4. Médias estaduais para "vs Estado" (apenas quando filtro específico ativo)
     estado_means: dict[str, float] = {}
