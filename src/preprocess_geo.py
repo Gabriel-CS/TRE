@@ -1,4 +1,4 @@
-# preprocess_geo.py
+
 import os
 import pandas as pd
 import geopandas as gpd
@@ -16,23 +16,11 @@ def preprocess_geo_for_year(year: str):
     
     # Carrega o dataset completo de seções (apenas colunas necessárias)
     df_completas = pd.read_csv(completas_path, sep=";", encoding="utf-8", compression="zip")
-    
-    # Prepara a análise para obter os status (reutiliza a lógica existente)
-    # Nota: Precisamos do df_2022 para o merge de modelo? Para geo, só precisamos das seções com status.
-    # Vamos criar um objeto UrnasCriticasAnalysis apenas para ter o df_criticas com status.
-    # Mas como não temos o log de votantes aqui (opcional), faremos um merge simplificado.
-    
-    # Opção mais leve: calcular status diretamente (sem log de votantes)
-    # Assumindo que o status já está no CSV 'urnas_completas' coluna 'STATUS'
-    # e que temos coordenadas nesse mesmo arquivo (ou em um arquivo separado de locais).
-    
-    # Se o arquivo 'locais_criticos.csv' já contém todas as seções com coordenadas e status,
+
     # basta filtrar por ano e status.
     geo_raw_path = f"data/data_map/locais_criticos_{year}.csv"
     if os.path.exists(geo_raw_path):
         df_geo = pd.read_csv(geo_raw_path)
-        # Filtra por ano (assumindo que existe coluna 'ANO' ou deriva da zona/seção)
-        # Se não houver, teremos que mapear. Por simplicidade, vamos assumir que o arquivo é global.
         
         for status in STATUS_LEVELS:
             if status is None:

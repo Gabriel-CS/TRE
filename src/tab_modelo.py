@@ -1,9 +1,3 @@
-"""
-src/tab_modelo.py
-─────────────────────────────────────────────────────────────────────────────
-Renderização completa da aba "Análise por Modelo de Urna".
-Delega todos os cálculos à instância de UrnasCriticasAnalysis recebida.
-"""
 from __future__ import annotations
 
 import gc
@@ -179,7 +173,6 @@ def _render_teclas_indevidas(analise) -> None:
             "font-size:0.85rem; font-weight:600;'>Resumo por Modelo</h5>",
             unsafe_allow_html=True,
         )
-
         st.markdown(f"""
                 <div class='resumo-card'>
                     <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 20px;">

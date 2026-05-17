@@ -1,8 +1,3 @@
-"""
-src/charts.py
-─────────────────────────────────────────────────────────────────────────────
-Helpers de gráficos Plotly compartilhados entre todas as abas do dashboard.
-"""
 from __future__ import annotations
 
 import plotly.graph_objects as go

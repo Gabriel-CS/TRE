@@ -1,19 +1,3 @@
-"""
-src/tab_criticidade.py
-─────────────────────────────────────────────────────────────────────────────
-Renderização completa da aba "Análise por Criticidade".
-
-Mudanças v2 (otimização de memória):
-  • Recebe ``df_secoes`` (analise.df_criticas) diretamente — elimina a
-    necessidade de um CSV de seções separado por aba.
-  • Recebe ``estado_means`` (dict pré-computado com apenas 3 colunas) para
-    o cálculo "delta vs Estado" sem manter o dataset completo em RAM.
-
-Três visões condicionais ao filtro de status:
-  • None / "Todas"  → Visão geral comparativa entre todos os níveis
-  • 0–3             → Diagnóstico detalhado do nível selecionado
-  • 4               → Estudo de caso das urnas supercríticas
-"""
 from __future__ import annotations
 
 import gc
@@ -54,8 +38,7 @@ def render_tab_criticidade(
 
     if status_filter is None or status_filter == "Todas":
         _render_visao_geral(df_secoes)
-    elif status_filter in [1, 2, 3]:
-        # NOTA: nível 0 removido do filtro. Se precisar voltar, adicione 0 à lista
+    elif status_filter in [0, 1, 2, 3]:
         _render_detalhamento_nivel(df_secoes, status_filter, estado_means or {})
     elif status_filter == 4:
         _render_estudo_caso_nivel4(df_secoes)
@@ -308,14 +291,14 @@ def _render_detalhamento_nivel(
 
 def _render_estudo_caso_nivel4(df: pd.DataFrame) -> None:
     st.markdown("""
-        <div class="section-header"><h2>Estudo de Caso: Urnas Emergência (Nível 4)</h2></div>
+        <div class="section-header"><h2>Estudo de Caso: Urnas Super Críticas (Nível 4)</h2></div>
         <div class="section-desc">Investigação individualizada das urnas com criticidade máxima.</div>
     """, unsafe_allow_html=True)
 
     if df.empty:
         st.markdown("""
             <div class="alert-box alert-success">
-                <b>Resultado positivo:</b> Não há urnas classificadas como Emergência (Nível 4) neste cenário.
+                <b>Resultado positivo:</b> Não há urnas classificadas como Super Críticas (Nível 4) neste cenário.
             </div>
         """, unsafe_allow_html=True)
         return
@@ -328,7 +311,7 @@ def _render_estudo_caso_nivel4(df: pd.DataFrame) -> None:
 
     st.markdown(f"""
         <div class="alert-box alert-danger">
-            <b>Atenção:</b> Foram encontradas <b>{len(df_sorted)}</b> urnas Emergência.
+            <b>Atenção:</b> Foram encontradas <b>{len(df_sorted)}</b> urnas Super Críticas.
             Selecione uma abaixo para investigação detalhada.
         </div>
     """, unsafe_allow_html=True)
