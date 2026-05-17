@@ -173,7 +173,6 @@ def _render_teclas_indevidas(analise) -> None:
             "font-size:0.85rem; font-weight:600;'>Resumo por Modelo</h5>",
             unsafe_allow_html=True,
         )
-
         st.markdown(f"""
                 <div class='resumo-card'>
                     <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 20px;">

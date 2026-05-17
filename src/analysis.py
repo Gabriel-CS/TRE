@@ -151,23 +151,7 @@ def _normalizar_colunas_zona_secao(df: pd.DataFrame) -> pd.DataFrame:
 # ──────────────────────────────────────────────────────────────────────────────
 
 class UrnasCriticasAnalysis:
-    """Calcula todas as métricas referentes às urnas críticas.
-
-    A partir da v2, suporta CSVs pré-filtrados por nível (um arquivo por
-    STATUS), evitando que o dataset completo seja carregado desnecessariamente.
-
-    Parâmetros relevantes
-    ─────────────────────
-    prefiltered : bool
-        Se True, o DataFrame ``df_completas`` já contém apenas as seções do
-        nível desejado — a filtragem por STATUS é pulada.  Padrão False
-        (comportamento original).
-    total_secoes_override : int | None
-        Total de seções em **todos** os níveis (para o KPI "Total Seções").
-        Só é necessário quando ``prefiltered=True``; se None, usa
-        ``len(df_completas)`` como antes.
-    """
-
+    """Calcula todas as métricas referentes às urnas críticas."""
     # ── Construtores ──────────────────────────────────────────────────────────
 
     def __init__(
@@ -197,12 +181,7 @@ class UrnasCriticasAnalysis:
         prefiltered: bool = False,
         total_secoes_override: int | None = None,
     ) -> "UrnasCriticasAnalysis":
-        """Constrói a análise a partir de DataFrames já carregados em memória.
-
-        Use este método quando os DataFrames forem gerenciados externamente
-        (p.ex. via cache separado no app.py), evitando leituras duplicadas
-        do disco.
-        """
+        """Constrói a análise a partir de DataFrames já carregados em memória."""
         obj = object.__new__(cls)
         obj.status_filter = status_filter
         obj._total_secoes_override = total_secoes_override
