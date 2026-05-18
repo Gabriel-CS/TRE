@@ -30,6 +30,108 @@ def render_tab_modelo(analise) -> None:
 # Seções individuais
 # ──────────────────────────────────────────────────────────────────────────────
 
+
+def _build_resumo_table(
+    col_headers: list[str],
+    rows: list[tuple],
+    title: str = "Resumo por Modelo",
+) -> str:
+    """
+    Gera HTML de cards de resumo com mini barra de proporção.
+
+    rows: lista de (cor_hex, model_name, v1_display, v2_display, v1_raw, v2_raw)
+      - v1_raw / v2_raw são numéricos usados para calcular a barra (v1/v2 * 100%).
+        Passe v1_raw=0 para ocultar a barra.
+    """
+    css = """
+<style>
+.rm-wrap{padding:4px 0;}
+.rm-section-title{
+  font-size:11px;font-weight:500;color:#888;
+  text-transform:uppercase;letter-spacing:.06em;
+  margin:0 0 8px;padding:0;
+}
+.rm-header{
+  display:flex;align-items:center;
+  padding:0 10px 5px;border-bottom:1px solid #e8e8e8;margin-bottom:4px;
+}
+.rm-hmodel{flex:1.4;font-size:10px;font-weight:500;color:#aaa;text-transform:uppercase;letter-spacing:.05em;}
+.rm-hcol{flex:1;font-size:10px;font-weight:500;color:#aaa;text-align:center;text-transform:uppercase;letter-spacing:.05em;}
+.rm-hcol.right{text-align:right;}
+.rm-row{
+  display:flex;align-items:center;
+  padding:7px 10px;border-radius:8px;margin-bottom:3px;
+  background:#f9f9fb;border:.5px solid #ebebef;gap:0;
+  transition:background .15s;
+}
+.rm-row:hover{background:#fff;border-color:#d5d5e0;}
+.rm-model{display:flex;align-items:center;gap:8px;flex:1.4;min-width:0;}
+.rm-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.rm-name{font-size:12.5px;font-weight:500;color:#222;}
+.rm-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;}
+.rm-col.right{align-items:flex-end;}
+.rm-val{font-size:12.5px;font-weight:500;color:#1a1a1a;}
+.rm-sub{font-size:10px;color:#aaa;letter-spacing:.02em;}
+.rm-bar-track{width:100%;height:3px;background:#e4e4ea;border-radius:99px;margin-top:3px;overflow:hidden;}
+.rm-bar-fill{height:3px;border-radius:99px;}
+</style>
+"""
+    # cabeçalho
+    h1, h2 = col_headers[1], col_headers[2]
+    header = (
+        f'<div class="rm-header">'
+        f'<div class="rm-hmodel">{col_headers[0]}</div>'
+        f'<div class="rm-hcol">{h1}</div>'
+        f'<div class="rm-hcol right">{h2}</div>'
+        f'</div>'
+    )
+
+    # calcula max de v1_raw para normalizar barras
+    raws = [r[4] for r in rows if len(r) > 4]
+    max_raw = max(raws) if raws else 1
+    if max_raw == 0:
+        max_raw = 1
+
+    cards = ""
+    for row in rows:
+        cor, model, v1_disp, v2_disp = row[0], row[1], row[2], row[3]
+        v1_raw = row[4] if len(row) > 4 else 0
+        v2_raw = row[5] if len(row) > 5 else 0
+
+        pct = min(v1_raw / max_raw * 100, 100) if max_raw else 0
+        bar_html = (
+            f'<div class="rm-bar-track">'
+            f'<div class="rm-bar-fill" style="width:{pct:.1f}%;background:{cor};"></div>'
+            f'</div>'
+        ) if v1_raw > 0 else ""
+
+        total_label = f'<span class="rm-sub">do total</span>' if v2_raw else ""
+
+        cards += (
+            f'<div class="rm-row">'
+            f'<div class="rm-model">'
+            f'  <span class="rm-dot" style="background:{cor};"></span>'
+            f'  <span class="rm-name">{model}</span>'
+            f'</div>'
+            f'<div class="rm-col">'
+            f'  <span class="rm-val">{v1_disp}</span>'
+            f'  {bar_html}'
+            f'</div>'
+            f'<div class="rm-col right">'
+            f'  {total_label}'
+            f'  <span class="rm-val">{v2_disp}</span>'
+            f'</div>'
+            f'</div>'
+        )
+
+    title_html = (
+        f'<p class="rm-section-title">{title}</p>'
+        if title else ""
+    )
+    return f'{css}<div class="rm-wrap">{title_html}{header}{cards}</div>'
+
+
+
 def _render_distribuicao(analise) -> None:
     st.markdown("""
         <div class="section-header"><h2>Distribuição de Modelos</h2></div>
@@ -81,50 +183,18 @@ def _render_falhas_biometricas(analise) -> None:
         del fig
 
     with col_bio2:
-        st.markdown(
-            "<h5 style='text-align: center; color: #1a3a5c; margin-top:0; margin-bottom:8px; "
-            "font-size:0.85rem; font-weight:600;'>Resumo por Modelo</h5>",
-            unsafe_allow_html=True,
-        )
-        
-        st.markdown(f"""
-                <div class='resumo-card'>
-                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 20px;">
-                        <div style="width: 120px;">
-                            <span class='resumo-nome'>Modelo</span>
-                        </div>
-                        <div style="text-align: center; flex: 1;">
-                            <div class='resumo-metrica-valor'>Solicitada</div>
-                        </div>
-                        <div style="text-align: right; width: 100px;">
-                            <div class='resumo-metrica-valor'>Falhas</div>
-                        </div>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
-        
+        _rows = []
         for i, m in enumerate(URN_MODELS):
             vm = analise.voters[m]
             bio_m = vm[vm["bio_solicitada"] == True]
-            falhas = (bio_m["n_falhas_bio"] > 0).sum()
-            cor = OKABE_ITO[i]
-            st.markdown(f"""
-                <div class='resumo-card'>
-                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 20px;">
-                        <div style="display: flex; align-items: center; gap: 6px; width: 120px;">
-                            <span class='resumo-dot' style='background:{cor};'></span>
-                            <span class='resumo-nome'>{m}</span>
-                        </div>
-                        <div style="text-align: center; flex: 1;">
-                            <div class='resumo-metrica-valor'>{len(bio_m):,}</div>
-                        </div>
-                        <div style="text-align: right; width: 130px;">
-                            <div class='resumo-metrica-valor'>{falhas:,}</div>
-                        </div>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
+            n_sol = len(bio_m)
+            falhas = int((bio_m["n_falhas_bio"] > 0).sum())
+            _rows.append((OKABE_ITO[i], m, f"{n_sol:,}", f"{falhas:,}", n_sol, falhas))
             del vm, bio_m
+        st.markdown(
+            _build_resumo_table(["Modelo", "Solicitada", "Falhas"], _rows, title="Resumo por Modelo"),
+            unsafe_allow_html=True,
+        )
 
     del bio
     gc.collect()
@@ -168,49 +238,17 @@ def _render_teclas_indevidas(analise) -> None:
         del fig
 
     with col2:
-        st.markdown(
-            "<h5 style='text-align: center; color: #1a3a5c; margin-top:0; margin-bottom:8px; "
-            "font-size:0.85rem; font-weight:600;'>Resumo por Modelo</h5>",
-            unsafe_allow_html=True,
-        )
-        st.markdown(f"""
-                <div class='resumo-card'>
-                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 20px;">
-                        <div style="width: 120px;">
-                            <span class='resumo-nome'>Modelo</span>
-                        </div>
-                        <div style="text-align: center; flex: 1;">
-                            <div class='resumo-metrica-valor'>Indevidas</div>
-                        </div>
-                        <div style="text-align: right; width: 100px;">
-                            <div class='resumo-metrica-valor'>Total</div>
-                        </div>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
-        
+        _rows = []
+        total_kp_int = int(total_kp)
         for i, m in enumerate(URN_MODELS):
             vm = analise.voters[m]
             qtd = int(vm[vm["n_teclas_inv"] > 0]["n_teclas_inv"].sum())
-            cor = OKABE_ITO[i]
-
-            st.markdown(f"""
-                <div class='resumo-card'>
-                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 20px;">
-                        <div style="display: flex; align-items: center; gap: 6px; width: 120px;">
-                            <span class='resumo-dot' style='background:{cor};'></span>
-                            <span class='resumo-nome'>{m}</span>
-                        </div>
-                        <div style="text-align: center; flex: 1;">
-                            <div class='resumo-metrica-valor'>{qtd:,}</div>
-                        </div>
-                        <div style="text-align: right; width: 130px;">
-                            <div class='resumo-metrica-valor'>{total_kp:,}</div>
-                        </div>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
+            _rows.append((OKABE_ITO[i], m, f"{qtd:,}", f"{total_kp_int:,}", qtd, total_kp_int))
             del vm
+        st.markdown(
+            _build_resumo_table(["Modelo", "Indevidas", "Total"], _rows, title="Resumo por Modelo"),
+            unsafe_allow_html=True,
+        )
 
     del inv_keys, total_kp
     gc.collect()
@@ -240,6 +278,8 @@ def _render_escolaridade(analise) -> None:
             URN_MODELS, low_edu["proportions"],
             text=[f"{v*100:.1f}%" for v in low_edu["proportions"]],
             title="Baixa Escolaridade por Modelo", yfmt=".0%", yrange=[0, 1.0],
+            x_categoryorder=URN_MODELS,
+            height=420,
         )
         st.plotly_chart(fig, use_container_width=True)
         del fig
@@ -272,6 +312,8 @@ def _render_faixa_etaria(analise) -> None:
             URN_MODELS, elderly["proportions"],
             text=[f"{v*100:.1f}%" for v in elderly["proportions"]],
             title="Eleitores Idosos (≥ 60 anos)", yfmt=".0%", yrange=[0, 1.0],
+            x_categoryorder=URN_MODELS,
+            height=420,
         )
         st.plotly_chart(fig, use_container_width=True)
         del fig

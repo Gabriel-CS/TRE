@@ -95,7 +95,7 @@ st.markdown("""
         /* ── Header principal ─────────────────────────────────────────── */
         .main-header {
             font-weight: 800; color: #0f172a; letter-spacing: -0.03em;
-            margin-bottom: 0.15rem; font-size: 1.65rem; line-height: 1.2;
+            margin-bottom: 0.15rem; font-size: 2.1rem; line-height: 1.2;
         }
         .sub-header {
             color: #64748b; font-size: 0.9rem; margin-top: 0; margin-bottom: 1.25rem;
@@ -107,7 +107,10 @@ st.markdown("""
             background: #ffffff;
             border: 1px solid #e2e8f0;
             border-radius: 14px;
-            padding: 1.25rem 1rem;
+            
+            /* ALTERAÇÃO: Aumente o primeiro valor para esticar em Y (ex: de 1.25rem para 2.1rem) */
+            padding: 2.1rem 1rem; 
+            
             text-align: center;
             box-shadow: 0 1px 4px rgba(15,23,42,0.05), 0 4px 16px rgba(15,23,42,0.04);
             transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -261,7 +264,7 @@ col_title, col_info = st.columns([3, 1])
 with col_title:
     st.markdown("""
         <div class="main-header">UFS · TRE</div>
-        <div class="sub-header">Análise operacional, sociodemográfica e geoespacial das urnas eletrônicas — Eleições Sergipe</div>
+        <div class="sub-header">Análise operacional, sociodemográfica e geoespacial das urnas eletrônicas</div>
     """, unsafe_allow_html=True)
 with col_info:
     st.markdown(f"""
@@ -272,24 +275,30 @@ with col_info:
     """, unsafe_allow_html=True)
 
 st.markdown(
-    "<hr style='margin: 0.5rem 0 1.5rem 0; border: none; border-top: 1px solid #e9ecef;'>",
+    "<hr style='margin: 0.2rem 0 1.2rem 0; border: none; border-top: 1px solid #e9ecef;'>",
     unsafe_allow_html=True,
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# FILTROS GLOBAIS
+# LINHA MESTRA: FILTROS + KPIs GLOBAIS
 # ═══════════════════════════════════════════════════════════════════════════════
-fil_col1, fil_col2, fil_col3 = st.columns([1, 1.6, 1.7])
+col_filtros, k1, k2, k3, k4, k5 = st.columns([1.6, 1, 1, 1, 1, 1])
 
-with fil_col1:
+# ── 1. Renderiza os Filtros ────────────────────────────────────────────────────
+with col_filtros:
     anos_disponiveis = sorted(DATA_CONFIG.keys())
     ano_selecionado = st.selectbox("Ano eleitoral", anos_disponiveis, index=len(anos_disponiveis) - 1)
 
-with fil_col2:
-    # Layout interno: dropdown à esquerda, botão de info à direita
-    col_status, col_info_btn = st.columns([4, 1])
+    if 'last_ano' not in st.session_state:
+        st.session_state['last_ano'] = ano_selecionado
 
-    with col_status:
+    if st.session_state['last_ano'] != ano_selecionado:
+        st.cache_data.clear()
+        st.session_state['last_ano'] = ano_selecionado
+        st.rerun()
+
+    col_sel, col_btn = st.columns([5, 1])
+    with col_sel:
         status_opcoes = {
             "Todas as críticas": None,
             "0 — Sem Atraso":         0,
@@ -298,19 +307,13 @@ with fil_col2:
             "3 — Crítico":            3,
             "4 — Super Crítica":      4,
         }
-
-        status_label = st.selectbox(
-            "Status operacional", 
-            list(status_opcoes.keys()),
-        )
+        status_label = st.selectbox("Status operacional", list(status_opcoes.keys()))
         status_filter = status_opcoes[status_label]
-
-    with col_info_btn:
+        
+    with col_btn:
         st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-
         import streamlit.components.v1 as _components
 
-        # (desc, cor, icon, intervalo_minutos)
         _STATUS_DESC = {
             0: ("Operação fluida, sem atraso significativo.",          "#0EA5E9", "✔", "< 6,48 min"),
             1: ("Atraso leve dentro da margem de tolerância.",         "#22C55E", "↑", "≥ 6,48 min e < 32,15 min"),
@@ -321,10 +324,8 @@ with fil_col2:
 
         _items_html = ""
         for lvl, label in STATUS_LABELS.items():
-            cor      = _STATUS_DESC[lvl][1]
-            icon     = _STATUS_DESC[lvl][2]
-            desc     = _STATUS_DESC[lvl][0]
-            intervalo = _STATUS_DESC[lvl][3]
+            # CORREÇÃO: Ordem de extração corrigida! (desc, cor, icone, intervalo)
+            desc, cor, icon, intervalo = _STATUS_DESC[lvl]
             _items_html += (
                 f'<div style="display:flex;gap:9px;align-items:flex-start;margin-bottom:9px;">'
                 f'  <div style="flex-shrink:0;width:28px;height:28px;border-radius:50%;'
@@ -341,225 +342,185 @@ with fil_col2:
             )
 
         _components.html(f"""<!DOCTYPE html>
-<html><head>
-<style>
-  *{{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif;}}
-  body{{background:transparent;overflow:visible;}}
-  #btn{{
-    width:40px;height:40px;border-radius:50%;
-    background:#ffffff;color:#0f172a;
-    font-size:18px;font-weight:800;line-height:40px;
-    text-align:center;cursor:pointer;user-select:none;
-    box-shadow:0 2px 8px rgba(15,23,42,0.15);
-    transition:background .18s,box-shadow .18s;
-    display:inline-block;border:none;outline:none;
-    border:1.5px solid #e2e8f0;
-  }}
-  #btn:hover{{background:#f1f5f9;box-shadow:0 4px 14px rgba(15,23,42,0.12);}}
-  #panel{{
-    position:fixed;
-    background:#fff;border:1px solid #e2e8f0;border-radius:12px;
-    padding:18px 18px 14px;
-    box-shadow:0 12px 40px rgba(15,23,42,0.18);
-    width:340px;z-index:2147483647;
-    opacity:0;
-    transform:translateY(-6px);
-    transition:opacity .25s ease, transform .25s ease;
-    pointer-events:none;
-  }}
-  #panel.visible{{
-    opacity:1;
-    transform:translateY(0);
-    pointer-events:auto;
-  }}
-  #title{{
-    font-size:13px;font-weight:700;text-transform:uppercase;
-    letter-spacing:.1em;color:#94a3b8;
-    padding-bottom:10px;margin-bottom:12px;
-    border-bottom:1px solid #f1f5f9;
-  }}
-  #bar{{height:3px;background:#e2e8f0;border-radius:2px;margin-top:10px;overflow:hidden;}}
-  #bar-fill{{height:100%;width:100%;background:#0072B2;border-radius:2px;transition:width 3s linear;}}
-</style>
-</head><body>
-<div id="btn">?</div>
-<script>
-  var btn   = document.getElementById('btn');
-  var timer = null;
-  var pDoc, panel, fill;
+        <html><head>
+        <style>
+          *{{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif;}}
+          body{{background:transparent;overflow:visible;}}
+          #btn{{
+            width:40px;height:40px;border-radius:50%;
+            background:#ffffff;color:#0f172a;
+            font-size:18px;font-weight:800;line-height:40px;
+            text-align:center;cursor:pointer;user-select:none;
+            box-shadow:0 2px 8px rgba(15,23,42,0.15);
+            transition:background .18s,box-shadow .18s;
+            display:inline-block;border:1.5px solid #e2e8f0;
+          }}
+          #btn:hover{{background:#f1f5f9;box-shadow:0 4px 14px rgba(15,23,42,0.12);}}
+        </style>
+        </head><body>
+        <div id="btn">?</div>
+        <script>
+          var btn = document.getElementById('btn');
+          var timer = null;
+          var pDoc = window.parent.document;
+          
+          var oldPanel = pDoc.getElementById('crit-panel-legend');
+          if(oldPanel) oldPanel.remove();
 
-  // Cria o painel diretamente no documento pai para ficar acima de todo conteúdo Streamlit
-  pDoc  = window.parent.document;
-  panel = pDoc.createElement('div');
-  panel.id = 'crit-panel-legend';
-  panel.innerHTML = `
-    <div id="crit-title" style="font-size:13px;font-weight:700;text-transform:uppercase;
-      letter-spacing:.1em;color:#94a3b8;padding-bottom:10px;margin-bottom:12px;
-      border-bottom:1px solid #f1f5f9;font-family:Inter,sans-serif;">Níveis de Criticidade</div>
-    {_items_html}
-    <div style="height:3px;background:#e2e8f0;border-radius:2px;margin-top:10px;overflow:hidden;">
-      <div id="crit-bar" style="height:100%;width:100%;background:#0072B2;border-radius:2px;
-        transition:width 3s linear;"></div>
-    </div>`;
+          var panel = pDoc.createElement('div');
+          panel.id = 'crit-panel-legend';
+          panel.innerHTML = `
+            <div id="crit-title" style="font-size:12px;font-weight:700;text-transform:uppercase;
+              letter-spacing:.1em;color:#94a3b8;padding-bottom:8px;margin-bottom:10px;
+              border-bottom:1px solid #f1f5f9;font-family:Inter,sans-serif;">Níveis de Criticidade</div>
+            {_items_html}
+            <div style="height:3px;background:#e2e8f0;border-radius:2px;margin-top:8px;overflow:hidden;">
+              <div id="crit-bar" style="height:100%;width:100%;background:#0072B2;border-radius:2px;
+                transition:width 3s linear;"></div>
+            </div>`;
 
-  Object.assign(panel.style, {{
-    position:'fixed', zIndex:'2147483647',
-    background:'#fff', border:'1px solid #e2e8f0', borderRadius:'12px',
-    padding:'18px 18px 14px', width:'340px',
-    boxShadow:'0 12px 40px rgba(15,23,42,0.18)',
-    fontFamily:'Inter,sans-serif',
-    opacity:'0', transform:'translateY(-8px)',
-    transition:'opacity .28s ease, transform .28s ease',
-    pointerEvents:'none', display:'none'
-  }});
+          // 1. DIMENSÕES: Largura ampliada e padding reduzido para encaixe
+          Object.assign(panel.style, {{
+            position:'fixed', zIndex:'2147483647', background:'#fff', border:'1px solid #e2e8f0', 
+            borderRadius:'12px', 
+            padding:'12px 18px 10px', 
+            width:'380px', 
+            boxShadow:'0 12px 40px rgba(15,23,42,0.18)', fontFamily:'Inter,sans-serif',
+            opacity:'0', transform:'translateY(-8px)',
+            transition:'opacity .28s ease, transform .28s ease',
+            pointerEvents:'none', display:'none'
+          }});
 
-  pDoc.body.appendChild(panel);
-  fill = pDoc.getElementById('crit-bar');
+          pDoc.body.appendChild(panel);
+          var fill = pDoc.getElementById('crit-bar');
 
-  function showPanel() {{
-    var frame = window.frameElement;
-    var fr    = frame.getBoundingClientRect();
-    var br    = btn.getBoundingClientRect();
-    panel.style.display = 'block';
-    panel.style.left    = (fr.left + br.left) + 'px';
-    panel.style.top     = (fr.top  + br.bottom + 8) + 'px';
+          function showPanel() {{
+            var frame = window.frameElement;
+            var fr    = frame.getBoundingClientRect();
+            var br    = btn.getBoundingClientRect();
+            
+            panel.style.display = 'block';
+            
+            // 2. POSICIONAMENTO: 
+            // Left: afasta um pouco do botão para a direita
+            // Top: Subtrai ~75px para alinhar o topo da caixa com o input de "Ano Eleitoral"
+            panel.style.left    = (fr.left + br.left + 50) + 'px'; 
+            panel.style.top     = (fr.top  + br.top - 75) + 'px';
 
-    // Força reflow para a transição funcionar a partir do estado inicial
-    panel.getBoundingClientRect();
-    panel.style.opacity       = '1';
-    panel.style.transform     = 'translateY(0)';
-    panel.style.pointerEvents = 'auto';
+            panel.getBoundingClientRect(); 
+            panel.style.opacity       = '1';
+            panel.style.transform     = 'translateY(0)';
+            panel.style.pointerEvents = 'auto';
 
-    // Barra de progresso
-    fill.style.transition = 'none';
-    fill.style.width      = '100%';
-    requestAnimationFrame(function() {{
-      requestAnimationFrame(function() {{
-        fill.style.transition = 'width 3s linear';
-        fill.style.width      = '0%';
-      }});
-    }});
+            fill.style.transition = 'none';
+            fill.style.width      = '100%';
+            requestAnimationFrame(function() {{
+              requestAnimationFrame(function() {{
+                fill.style.transition = 'width 3s linear';
+                fill.style.width      = '0%';
+              }});
+            }});
 
-    clearTimeout(timer);
-    timer = setTimeout(hidePanel, 3000);
-  }}
+            clearTimeout(timer);
+            timer = setTimeout(hidePanel, 3000);
+          }}
 
-  function hidePanel() {{
-    panel.style.opacity       = '0';
-    panel.style.transform     = 'translateY(-8px)';
-    panel.style.pointerEvents = 'none';
-    setTimeout(function() {{ panel.style.display = 'none'; }}, 280);
-  }}
+          function hidePanel() {{
+            panel.style.opacity       = '0';
+            panel.style.transform     = 'translateY(-8px)';
+            panel.style.pointerEvents = 'none';
+            setTimeout(function() {{ panel.style.display = 'none'; }}, 280);
+          }}
 
-  btn.addEventListener('click', function() {{
-    if (panel.style.display === 'none' || panel.style.opacity === '0') {{
-      showPanel();
-    }} else {{
-      clearTimeout(timer);
-      hidePanel();
-    }}
-  }});
-</script>
-</body></html>""", height=50, scrolling=False)
+          btn.addEventListener('click', function() {{
+            if (panel.style.display === 'none' || panel.style.opacity === '0') {{
+              showPanel();
+            }} else {{
+              clearTimeout(timer);
+              hidePanel();
+            }}
+          }});
+        </script>
+        </body></html>""", height=50, scrolling=False)
 
-if 'last_ano' not in st.session_state:
-    st.session_state['last_ano'] = ano_selecionado
-
-if st.session_state['last_ano'] != ano_selecionado:
-    # Ano mudou: limpa todos os caches para liberar memória do ano anterior
-    st.cache_data.clear()
-    st.session_state['last_ano'] = ano_selecionado
-    st.rerun()
-
-with fil_col3:
-    pass
-#═══════════════════════════════════════════════════════════════════════════════
-# VALIDAÇÃO DE ARQUIVOS
-# ═══════════════════════════════════════════════════════════════════════════════
-st.markdown("<div style='height: 0.5rem;'></div>", unsafe_allow_html=True)
+# ── 2. Validação e Carregamento de Dados ───────────────────────────────────────
 cfg = DATA_CONFIG[ano_selecionado]
-
 nivel_path   = cfg["niveis"][_nivel_key(status_filter)]
 modelo_path  = cfg["modelos_urnas"][_nivel_key(status_filter)]
 
 for path_check, label in [(nivel_path, "Níveis"), (modelo_path, "Modelos")]:
     if not os.path.exists(path_check):
-        st.error(
-            f"Arquivo não encontrado ({label}): `{path_check}`  \n"
-            "Verifique os caminhos em `DATA_CONFIG`."
-        )
+        st.error(f"Arquivo não encontrado ({label}): `{path_check}`")
         st.stop()
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# CARREGAMENTO DE DADOS  (apenas os 2 arquivos do filtro ativo)
-# ═══════════════════════════════════════════════════════════════════════════════
 with st.spinner("Carregando dados..."):
-    # 1. Seções do nível selecionado (demografia + ocorrências agregadas por seção)
     df_secoes = _load_csv_cached(nivel_path)
-
-    # 2. Log de votantes do nível selecionado (métricas operacionais por modelo de urna)
     df_voter_log = _load_csv_cached(modelo_path)
 
-    # 3. Total global de seções (inclui nível 0 — Sem Atraso — agora disponível no filtro)
     n_all_path   = cfg["niveis"][_nivel_key(None)]
-    total_crit   = _count_rows(n_all_path) if os.path.exists(n_all_path) else 0
-    total_secoes_global = total_crit
+    total_secoes_global = _count_rows(n_all_path) if os.path.exists(n_all_path) else 0
 
-    # 4. Médias estaduais para "vs Estado" (apenas quando filtro específico ativo)
     estado_means: dict[str, float] = {}
-    if status_filter is not None:
-        if os.path.exists(n_all_path):
-            estado_means = _load_estado_means(n_all_path)
+    if status_filter is not None and os.path.exists(n_all_path):
+        estado_means = _load_estado_means(n_all_path)
 
-# Constrói a análise a partir dos DataFrames já em RAM (zero I/O adicional)
 analise = UrnasCriticasAnalysis.from_dataframes(
-    df_2022=df_voter_log,          # log de votantes filtrado por nível (modelos_urnas)
-    df_completas=df_secoes,        # seções filtradas por nível (niveis)
+    df_2022=df_voter_log,
+    df_completas=df_secoes,
     status_filter=status_filter,
-    prefiltered=True,              # df_completas já está filtrado pelo status
+    prefiltered=True,
     total_secoes_override=total_secoes_global,
 )
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# KPIs GLOBAIS
-# ═══════════════════════════════════════════════════════════════════════════════
 overview = analise.get_overview()
 pct = overview["total_secoes_criticas"] / max(overview["total_secoes"], 1)
 
-k1, k2, k3, k4, k5 = st.columns(5)
+# ── 3. Renderiza os KPIs nas colunas restantes (Centralizados verticalmente) ───
+# O estilo com `margin-top: 1.8rem;` empurra a caixa exatamente para o eixo Y
+# central das duas caixas de input à esquerda.
 with k1:
     st.markdown(f"""
-        <div class="kpi-box">
-            <div class="kpi-label">Selecionadas</div>
-            <div class="kpi-value kpi-danger">{overview['total_secoes_criticas']:,}</div>
+        <div style="margin-top: 1.8rem; height: 100%;">
+            <div class="kpi-box">
+                <div class="kpi-label">Selecionadas</div>
+                <div class="kpi-value kpi-danger">{overview['total_secoes_criticas']:,}</div>
+            </div>
         </div>
     """, unsafe_allow_html=True)
 with k2:
     st.markdown(f"""
-        <div class="kpi-box">
-            <div class="kpi-label">Total Seções</div>
-            <div class="kpi-value">{overview['total_secoes']:,}</div>
+        <div style="margin-top: 1.8rem; height: 100%;">
+            <div class="kpi-box">
+                <div class="kpi-label">Total Seções</div>
+                <div class="kpi-value">{overview['total_secoes']:,}</div>
+            </div>
         </div>
     """, unsafe_allow_html=True)
 with k3:
     st.markdown(f"""
-        <div class="kpi-box">
-            <div class="kpi-label">Votantes</div>
-            <div class="kpi-value kpi-success">{overview['total_votantes']:,}</div>
+        <div style="margin-top: 1.8rem; height: 100%;">
+            <div class="kpi-box">
+                <div class="kpi-label">Votantes</div>
+                <div class="kpi-value kpi-success">{overview['total_votantes']:,}</div>
+            </div>
         </div>
     """, unsafe_allow_html=True)
 with k4:
     st.markdown(f"""
-        <div class="kpi-box">
-            <div class="kpi-label">Modelos</div>
-            <div class="kpi-value">{len(overview['modelos_presentes'])}</div>
+        <div style="margin-top: 1.8rem; height: 100%;">
+            <div class="kpi-box">
+                <div class="kpi-label">Modelos</div>
+                <div class="kpi-value">{len(overview['modelos_presentes'])}</div>
+            </div>
         </div>
     """, unsafe_allow_html=True)
 with k5:
     st.markdown(f"""
-        <div class="kpi-box">
-            <div class="kpi-label">Taxa Selecionada</div>
-            <div class="kpi-value kpi-accent">{pct:.1%}</div>
+        <div style="margin-top: 1.8rem; height: 100%;">
+            <div class="kpi-box">
+                <div class="kpi-label">Taxa</div>
+                <div class="kpi-value kpi-accent">{pct:.1%}</div>
+            </div>
         </div>
     """, unsafe_allow_html=True)
 
@@ -598,8 +559,11 @@ gc.collect()
 # ═══════════════════════════════════════════════════════════════════════════════
 st.markdown("""
     <div class="footer">
-        <div style="font-weight: 600; color: #adb5bd; margin-bottom: 0.25rem;">
+        <div style="font-weight: 600; color: #adb5bd; margin-bottom: 0.35rem;">
             UFS · TRE — Sistema de Análise de Urnas Eletrônicas
+        </div>
+        <div style="margin-bottom: 0.4rem; color: #64748b; font-size: 0.82rem;">
+            Desenvolvido pela equipe da <a href="https://sites.google.com/mat.ufs.br/lame/lame?authuser=0" target="_blank" style="color: #0072B2; text-decoration: none; font-weight: 600; border-bottom: 1px dashed #0072B2;">LAME (Liga Acadêmica de Matemática e Empresa)</a>
         </div>
         <div>Dados: TSE / Urnas Eletrônicas · Eleições Sergipe | Dashboard desenvolvido com Streamlit</div>
     </div>
