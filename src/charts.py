@@ -32,7 +32,8 @@ def apply_base_layout(fig: go.Figure, height: int = 360) -> go.Figure:
 # ──────────────────────────────────────────────────────────────────────────────
 
 def bar_chart(
-    x, y, text=None, title="", yfmt=None, yrange=None, height=360
+    x, y, text=None, title="", yfmt=None, yrange=None, height=360,
+    x_categoryorder: list | None = None,
 ) -> go.Figure:
     fig = go.Figure(go.Bar(
         x=x, y=y,
@@ -47,6 +48,13 @@ def bar_chart(
         fig.update_layout(yaxis_tickformat=yfmt)
     if yrange:
         fig.update_layout(yaxis_range=yrange)
+    if x_categoryorder is not None:
+        fig.update_layout(xaxis=dict(
+            categoryorder="array",
+            categoryarray=x_categoryorder,
+            showgrid=False,
+            linecolor="#CCCCCC",
+        ))
     return apply_base_layout(fig, height)
 
 
@@ -92,6 +100,12 @@ def stacked_bar(df_pct, labels, colors, title="", height=420) -> go.Figure:
         legend=dict(orientation="h", yanchor="bottom", y=-0.30, xanchor="center", x=0.5),
         margin=dict(t=50, b=80, l=50, r=20),
         showlegend=True,
+        xaxis=dict(
+            categoryorder="array",
+            categoryarray=URN_MODELS,
+            showgrid=False,
+            linecolor="#CCCCCC",
+        ),
     )
     fig.update_layout(yaxis=dict(
         tickformat=".0%", range=[0, 1.0],

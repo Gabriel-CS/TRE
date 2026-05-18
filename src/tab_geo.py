@@ -130,8 +130,10 @@ def _kpi_card(cor: str, label: str, qtd: int) -> str:
     """Retorna HTML de um card KPI compacto e proporcional (inline, sem quebras)."""
     return (
         f'<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;'
-        f'padding:0.55rem 0.4rem;text-align:center;box-shadow:0 1px 3px rgba(15,23,42,0.04);'
-        f'border-top:3px solid {cor};min-width:0;flex:1;">'
+        # ALTERAÇÃO: Padding vertical aumentado e flexbox para centralização Y
+        f'padding:1.8rem 0.4rem;text-align:center;box-shadow:0 1px 3px rgba(15,23,42,0.04);'
+        f'border-top:3px solid {cor};min-width:0;flex:1;'
+        f'display:flex;flex-direction:column;justify-content:center;height:100%;">'
         f'<div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;'
         f'letter-spacing:0.08em;color:{cor};margin-bottom:0.3rem;'
         f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{label}</div>'
@@ -320,19 +322,20 @@ def render_tab_geo(ano: str, status_filter: int | None) -> None:
         </style>
     """, unsafe_allow_html=True)
 
-    # ── Layout: Municípios | Status | Boxes ────────────────────────────────
-    selec_m, status_col, box_q = st.columns([1.5, 1, 1.2])
+    # ── Layout: Filtros | KPIs | Configurações ─────────────────────────────────
+    col_filtros, col_kpis, col_config = st.columns([1.3, 2.5, 1.2])
 
     # ═══════════════════════════════════════════════════════════════════════
-    # PASSO 1 — Renderizar STATUS primeiro (coluna do meio) para obter o valor
-    #          antes de filtrar os municípios. Visualmente continua no meio.
+    # COLUNA 1 — Filtros (Empilhados)
     # ═══════════════════════════════════════════════════════════════════════
-    with status_col:
+    with col_filtros:
+        # Renderizar STATUS primeiro (ele filtra os municípios)
         status_presentes = sorted(gdf_geo["STATUS"].dropna().unique())
         opcoes_filtradas = {
             k: v for k, v in _STATUS_OPCOES.items()
             if v is None or v in status_presentes
         }
+        
         if status_filter is not None and status_filter in status_presentes:
             label_default = next(
                 (k for k, v in _STATUS_OPCOES.items() if v == status_filter),
@@ -349,21 +352,15 @@ def render_tab_geo(ano: str, status_filter: int | None) -> None:
         )
         status_filter_local = opcoes_filtradas[status_label_local]
 
-    # ═══════════════════════════════════════════════════════════════════════
-    # PASSO 2 — Filtrar dados pelo status local e extrair municípios válidos
-    # ═══════════════════════════════════════════════════════════════════════
-    if status_filter_local is not None:
-        gdf_geo_status = gdf_geo[gdf_geo["STATUS"] == status_filter_local].copy()
-    else:
-        gdf_geo_status = gdf_geo.copy()
+        # Filtrar dados pelo status para obter municípios válidos
+        if status_filter_local is not None:
+            gdf_geo_status = gdf_geo[gdf_geo["STATUS"] == status_filter_local].copy()
+        else:
+            gdf_geo_status = gdf_geo.copy()
 
-    municipios_disponiveis = sorted(gdf_geo_status["NM_MUNICIPIO"].dropna().unique())
+        municipios_disponiveis = sorted(gdf_geo_status["NM_MUNICIPIO"].dropna().unique())
 
-    # ═══════════════════════════════════════════════════════════════════════
-    # PASSO 3 — Renderizar MUNICÍPIOS (coluna da esquerda) com lista filtrada
-    # ═══════════════════════════════════════════════════════════════════════
-    with selec_m:
-        # Recupera seleção anterior e remove municípios que não existem mais
+        # Renderizar MUNICÍPIOS logo abaixo
         prev_sel = st.session_state.get("_geo_muni_main", [])
         valid_prev = [m for m in prev_sel if m in municipios_disponiveis]
 
@@ -371,13 +368,13 @@ def render_tab_geo(ano: str, status_filter: int | None) -> None:
             "Municípios",
             municipios_disponiveis,
             default=valid_prev,
-            placeholder="Selecione um ou mais municípios...",
+            placeholder="Selecione um ou mais...",
             key="_geo_muni_main",
-            help="Filtra o mapa exibindo apenas os municípios selecionados. Deixe vazio para mostrar todos."
+            help="Filtra o mapa exibindo apenas os municípios selecionados."
         )
 
     # ═══════════════════════════════════════════════════════════════════════
-    # PASSO 4 — Aplicar filtro de município e renderizar boxes
+    # APLICAÇÃO DO FILTRO FINAL
     # ═══════════════════════════════════════════════════════════════════════
     mask = pd.Series(True, index=gdf_geo_status.index)
     if selected_munis:
@@ -389,9 +386,13 @@ def render_tab_geo(ano: str, status_filter: int | None) -> None:
         st.info("Nenhum ponto corresponde aos filtros selecionados.")
         return
 
-    with box_q:
-        st.markdown("<div style='height: 0.15rem;'></div>", unsafe_allow_html=True)
-
+    # ═══════════════════════════════════════════════════════════════════════
+    # COLUNA 2 — KPIs (Alinhados no centro horizontal)
+    # ═══════════════════════════════════════════════════════════════════════
+    with col_kpis:
+        # Margin-top para empurrar as boxes e alinhar com o centro dos filtros
+        st.markdown("<div style='margin-top: 1.8rem;'></div>", unsafe_allow_html=True)
+        
         if status_filter_local is None:
             counts = gdf_map["STATUS"].value_counts().sort_index()
             cards_html = "".join(
@@ -412,25 +413,45 @@ def render_tab_geo(ano: str, status_filter: int | None) -> None:
             qtd = len(gdf_map)
             st.markdown(_kpi_card(cor, label, qtd), unsafe_allow_html=True)
 
-    st.markdown("<div style='height: 1.25rem;'></div>", unsafe_allow_html=True)
-
     # ═══════════════════════════════════════════════════════════════════════
-    # TOGGLE DE VORONOI — linha de controle abaixo dos filtros
+    # COLUNA 3 — Configurações do Mapa
     # ═══════════════════════════════════════════════════════════════════════
-    _, voronoi_col, _ = st.columns([1.5, 2, 1.2])
-    with voronoi_col:
-        exibir_voronoi = st.checkbox(
-            "🔷 Exibir Tesselação de Voronoi (por status)",
-            value=False,
-            key="_geo_voronoi_toggle",
-            help=(
-                "Divide o mapa em células de Voronoi ao redor de cada local de votação, "
-                "coloridas pelo nível de criticidade. Elimina o viés de densidade urbana "
-                "presente em mapas de calor."
-            ),
+    with col_config:
+        st.markdown("""
+            <div style="font-family: 'Inter', sans-serif; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; margin-bottom: 0.6rem; margin-top: 0.2rem;">
+                ⚙️ Ajustes Visuais
+            </div>
+        """, unsafe_allow_html=True)
+        
+        # 1. Seletor de Tema do Mapa Base
+        estilo_mapa = st.selectbox(
+            "Tema Base",
+            options=["Claro (Positron)", "Escuro (Dark Matter)", "Padrão (Voyager)", "OpenStreetMap"],
+            index=0,
+            label_visibility="collapsed",
+            help="Altera o provedor de estilo do mapa de fundo."
         )
 
-    st.markdown("<div style='height: 0.5rem;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height: 0.2rem;'></div>", unsafe_allow_html=True)
+        
+        # 2. Chaves de renderização (Toggles)
+        agrupar_pontos = st.checkbox("📍 Agrupar Pontos", value=True, help="Agrupa marcadores próximos para limpar a visualização.")
+        exibir_voronoi = st.checkbox(
+            "🔷 Voronoi",
+            value=False,
+            key="_geo_voronoi_toggle",
+            help="Divide o mapa em células de influência ao redor de cada local de votação.",
+        )
+
+    st.markdown("<div style='height: 1.0rem;'></div>", unsafe_allow_html=True)
+    # ========== MAPEAMENTO DE TEMAS ==========
+    dicionario_tiles = {
+        "Claro (Positron)": "CartoDB positron",
+        "Escuro (Dark Matter)": "CartoDB dark_matter",
+        "Padrão (Voyager)": "CartoDB voyager",
+        "OpenStreetMap": "OpenStreetMap"
+    }
+    tema_selecionado = dicionario_tiles.get(estilo_mapa, "CartoDB positron")
 
     # ========== MAPA MINIMALISTA ==========
     m = folium.Map(
@@ -439,8 +460,8 @@ def render_tab_geo(ano: str, status_filter: int | None) -> None:
         min_zoom=SERGIPE_MIN_ZOOM,
         max_zoom=18,
         max_bounds=True,
-        tiles="CartoDB voyager",
-        attr="CartoDB",
+        tiles=tema_selecionado, # Usa o tema escolhido pelo usuário
+        attr="CartoDB" if "CartoDB" in tema_selecionado else None,
         control_scale=True,
     )
 
@@ -451,39 +472,24 @@ def render_tab_geo(ano: str, status_filter: int | None) -> None:
     m.options['maxBoundsViscosity'] = 1.0
     m.options['minZoom'] = SERGIPE_MIN_ZOOM
 
-    # Adiciona o GeoJSON dos municípios com estilo minimalista
+    # Adiciona o GeoJSON dos municípios (Oculto código do geojson_se para encurtar, mantenha o seu original!)
     geojson_se = _carregar_geojson_sergipe()
     if geojson_se:
         folium.GeoJson(
             geojson_se,
             name="Municípios de Sergipe",
             style_function=lambda feature: {
-                "fillColor": "#d1d5db",
-                "color": "#4b5563",
-                "weight": 1.2,
-                "fillOpacity": 0.15,
-                "opacity": 0.7,
+                "fillColor": "#d1d5db", "color": "#4b5563",
+                "weight": 1.2, "fillOpacity": 0.15, "opacity": 0.7,
             },
             highlight_function=lambda feature: {
-                "fillColor": "#9ca3af",
-                "fillOpacity": 0.3,
-                "weight": 1.8,
-                "color": "#1f2937",
+                "fillColor": "#9ca3af", "fillOpacity": 0.3,
+                "weight": 1.8, "color": "#1f2937",
             },
-            tooltip=folium.GeoJsonTooltip(
-                fields=["name"],
-                aliases=["Município:"],
-                localize=True,
-                sticky=False,
-                style=(
-                    "font-family: 'Inter', sans-serif; font-size: 0.75rem;"
-                    "background: #ffffffcc; border-radius: 6px; border: none;"
-                    "padding: 4px 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);"
-                ),
-            ),
+            tooltip=folium.GeoJsonTooltip(fields=["name"], aliases=["Município:"], localize=True, sticky=False)
         ).add_to(m)
 
-    # ── Camada de Voronoi (opcional) ─────────────────────────────────────────
+    # ── Camada 1: Voronoi (opcional) ─────────────────────────────────────────
     if exibir_voronoi and geojson_se:
         if len(gdf_map) < 4:
             st.warning("São necessários ao menos 4 pontos para gerar a tesselação de Voronoi.")
@@ -492,73 +498,82 @@ def render_tab_geo(ano: str, status_filter: int | None) -> None:
                 grupo_vor = _gerar_voronoi_layer(gdf_map, geojson_se)
             if grupo_vor is not None:
                 grupo_vor.add_to(m)
-            else:
-                st.warning(
-                    "Não foi possível gerar o Voronoi com os dados filtrados. "
-                    "Tente ampliar o filtro de municípios ou status."
-                )
 
-    # ── Cluster de marcadores (pontos dos locais críticos) ───────────────────
-    cluster = MarkerCluster(name="Locais Críticos", overlay=True, control=False).add_to(m)
+    # ── Camada 3: Marcadores (Clusterizado ou Individual) ────────────────────
+    if agrupar_pontos:
+        container_marcadores = MarkerCluster(name="Locais Críticos", overlay=True, control=False).add_to(m)
+    else:
+        container_marcadores = folium.FeatureGroup(name="Locais Críticos", overlay=True, control=False).add_to(m)
 
-    for _, row in gdf_map.iterrows():
-        status = int(row["STATUS"])
-        cor = _COR_STATUS.get(status, "#6c757d")
-        label = _STATUS_LABELS.get(status, f"Status {status}")
+    # 1. Ordenar por STATUS descendente para garantir que a cor principal seja o pior cenário
+    gdf_sorted = gdf_map.sort_values(by="STATUS", ascending=False)
+    
+    # 2. Agrupar por Coordenadas e Local de Votação
+    cols_agrupamento = ["NR_LATITUDE", "NR_LONGITUDE", "NM_LOCAL_VOTACAO", "NM_MUNICIPIO"]
+    grupos_locais = gdf_sorted.groupby(cols_agrupamento)
 
-        zona_val = int(row["NR_ZONA"]) if "NR_ZONA" in row.index and pd.notna(row["NR_ZONA"]) else "—"
-        secao_val = int(row["NR_SECAO"]) if "NR_SECAO" in row.index and pd.notna(row["NR_SECAO"]) else "—"
-        modelo_val = str(row["modelo"]) if "modelo" in row.index and pd.notna(row["modelo"]) else "—"
+    for (lat, lon, local, municipio), df_local in grupos_locais:
+        # Pega a métrica mais alta do grupo para estilizar o marcador principal
+        status_maximo = int(df_local["STATUS"].max())
+        cor_principal = _COR_STATUS.get(status_maximo, "#6c757d")
+        label_principal = _STATUS_LABELS.get(status_maximo, f"Status {status_maximo}")
+        qtd_secoes = len(df_local)
 
-        atraso_html = ""
-        if "ATRASO_FILA_MINUTOS" in row.index and pd.notna(row["ATRASO_FILA_MINUTOS"]):
-            atraso_min = float(row["ATRASO_FILA_MINUTOS"])
-            atraso_html = (
-                f'<div style="font-size:0.8rem;color:#475569;margin-bottom:0.25rem;">'
-                f'<b>⏱ Atraso:</b> {atraso_min:.1f} min</div>'
-            )
-
+        # 3. Construir HTML do Cabeçalho Fixo (Sticky)
+        # max-height e overflow-y criam uma barra de rolagem nativa se houver muitas seções no mesmo local
         popup_html = f"""
-            <div style="font-family:'Inter',sans-serif;min-width:220px;max-width:260px;">
-                <div style="background:{cor}12;border-left:3px solid {cor};
-                            padding:6px 8px;border-radius:0 4px 4px 0;margin-bottom:8px;">
-                    <div style="font-size:0.9rem;font-weight:700;color:#0f172a;margin-bottom:2px;">
-                        {row['NM_LOCAL_VOTACAO']}
+            <div style="font-family:'Inter',sans-serif; min-width:240px; max-width:280px; max-height:300px; overflow-y:auto; overflow-x:hidden; padding-right:4px;">
+                <div style="background-color:rgba(255,255,255,0.95); position:sticky; top:0; z-index:999; padding-bottom:4px; margin-bottom:8px;">
+                    <div style="background:{cor_principal}12; border-left:3px solid {cor_principal}; padding:6px 8px; border-radius:0 4px 4px 0;">
+                        <div style="font-size:0.9rem; font-weight:700; color:#0f172a; margin-bottom:2px; line-height:1.2;">{local}</div>
+                        <div style="font-size:0.75rem; color:#64748b;">{municipio} • <b>{qtd_secoes}</b> seções críticas</div>
                     </div>
-                    <div style="font-size:0.75rem;color:#64748b;">{row['NM_MUNICIPIO']}</div>
                 </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;
-                            font-size:0.75rem;color:#475569;margin-bottom:6px;">
-                    <div><b>Zona:</b> {zona_val}</div>
-                    <div><b>Seção:</b> {secao_val}</div>
-                    <div><b>Modelo:</b> {modelo_val}</div>
-                </div>
-                {atraso_html}
-                <div style="margin-top:4px;">
-                    <span style="background:{cor}20;color:{cor};padding:2px 8px;
-                                 border-radius:16px;font-size:0.65rem;font-weight:700;
-                                 text-transform:uppercase;letter-spacing:0.03em;">
-                        Nível {status} · {label}
-                    </span>
-                </div>
-            </div>
         """
 
+        # 4. Iterar sobre as seções do grupo para construir a lista interna do Pop-up
+        for _, row in df_local.iterrows():
+            status_sec = int(row["STATUS"])
+            cor_sec = _COR_STATUS.get(status_sec, "#6c757d")
+            
+            zona_val = int(row["NR_ZONA"]) if "NR_ZONA" in row.index and pd.notna(row["NR_ZONA"]) else "—"
+            secao_val = int(row["NR_SECAO"]) if "NR_SECAO" in row.index and pd.notna(row["NR_SECAO"]) else "—"
+            modelo_val = str(row["modelo"]) if "modelo" in row.index and pd.notna(row["modelo"]) else "—"
+
+            atraso_html = ""
+            if "ATRASO_FILA_MINUTOS" in row.index and pd.notna(row["ATRASO_FILA_MINUTOS"]):
+                atraso_min = float(row["ATRASO_FILA_MINUTOS"])
+                atraso_html = f'<div style="font-size:0.75rem; color:#475569; margin-top:4px;"><b>⏱ Atraso:</b> {atraso_min:.1f} min</div>'
+
+            # Sub-card da seção
+            popup_html += f"""
+                <div style="border:1px solid #e2e8f0; border-radius:6px; padding:6px; margin-bottom:6px; background:#fafafa;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <span style="font-size:0.75rem; font-weight:700; color:#334155;">Zona: {zona_val} | Seç: {secao_val}</span>
+                        <span style="background:{cor_sec}20; color:{cor_sec}; padding:2px 6px; border-radius:10px; font-size:0.6rem; font-weight:800; text-transform:uppercase;">Nível {status_sec}</span>
+                    </div>
+                    <div style="font-size:0.7rem; color:#64748b;"><b>Modelo:</b> {modelo_val}</div>
+                    {atraso_html}
+                </div>
+            """
+
+        popup_html += "</div>"
+
+        # 5. Instanciar o marcador único
         folium.CircleMarker(
-            location=[row.geometry.y, row.geometry.x],
-            radius=5 + (status * 1.2),
-            popup=folium.Popup(popup_html, max_width=270),
+            location=[lat, lon],
+            radius=5 + (status_maximo * 1.2),
+            popup=folium.Popup(popup_html, max_width=300),
             tooltip=folium.Tooltip(
-                f"<b>{row['NM_LOCAL_VOTACAO']}</b><br>"
-                f"<span style='color:{cor};font-weight:500;'>{label}</span>",
-                sticky=False,
+                f"<b>{local}</b><br><span style='color:{cor_principal};font-weight:500;'>{label_principal}</span><br><span style='font-size:0.75rem;color:#64748b;'>{qtd_secoes} seções aglomeradas</span>", 
+                sticky=False
             ),
-            color=cor,
+            color=cor_principal,
             fill=True,
-            fillColor=cor,
+            fillColor=cor_principal,
             fillOpacity=0.85,
             weight=1.5,
-        ).add_to(cluster)
+        ).add_to(container_marcadores)
 
     folium.LayerControl(collapsed=True).add_to(m)
 
@@ -624,5 +639,5 @@ def render_tab_geo(ano: str, status_filter: int | None) -> None:
     with map_col:
         st_folium(m, width=1450, height=720, returned_objects=[])
 
-    del gdf_map, cluster, m
+    del gdf_map, container_marcadores, m
     gc.collect()
