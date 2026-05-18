@@ -19,134 +19,30 @@ def render_tab_criticidade(
     status_filter,
     estado_means: dict | None = None,
 ) -> None:
+    """Renderiza o conteúdo completo da aba 'Análise por Criticidade'.
+
+    Parâmetros
+    ──────────
+    df_secoes : DataFrame
+        ``analise.df_criticas`` — seções já filtradas pelo nível selecionado.
+    status_filter : int | None
+        Nível de criticidade selecionado globalmente.
+    estado_means : dict | None
+        Médias estaduais globais (todas as seções críticas) para as colunas
+        TIMEOUT_BIOMETRIA, INATIVIDADE e TECLA_INDEVIDA.  Necessário
+        apenas para o "Diagnóstico Detalhado" (status 0–3).
+    """
     if df_secoes is None or df_secoes.empty:
         st.error("Dados de seções não disponíveis para este filtro.")
         return
 
     if status_filter is None or status_filter == "Todas":
         _render_visao_geral(df_secoes)
-        
     elif status_filter in [0, 1, 2, 3]:
         _render_detalhamento_nivel(df_secoes, status_filter, estado_means or {})
-        
     elif status_filter == 4:
-        # TÍTULOS DA SEÇÃO
-        st.markdown("""
-            <div class="section-header"><h2>Diagnóstico Detalhado por Nível</h2></div>
-            <div class="section-desc">Análise comparativa do nível selecionado contra a média estadual.</div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown(
-            "<h3 style='color: #1a3a5c; font-weight: 600; margin-bottom: 1rem;'>Detalhamento: Urnas Super Críticas (Nível 4)</h3>",
-            unsafe_allow_html=True,
-        )
-        
-        # 1. FUNÇÃO COM BUSCA BLINDADA (Força o tempo a aparecer mesmo sem a coluna)
-        def _get_metrics_nivel4(col_ocorr: str, col_tempo: str | None = None):
-            m_niv = df_secoes[col_ocorr].mean() if col_ocorr in df_secoes.columns else 0
-            m_est = (estado_means or {}).get(col_ocorr, m_niv)
-            delta = ((m_niv / m_est) - 1) * 100 if m_est > 0 else 0
-            
-            tempo_str = ""
-            if col_tempo:
-                seg = df_secoes.get(col_tempo, pd.Series([0])).mean()
-                if pd.notna(seg):
-                    tempo_str = f"Tempo total: ~{int(seg)//60}m {int(seg)%60}s"
-            return m_niv, delta, tempo_str
-
-        # Renderizando os 3 Cartões de Métricas (KPIs)
-        # Renderizando os 3 Cartões de Métricas (KPIs) com Dica Visual (Tooltip)
-        col_k1, col_k2, col_k3 = st.columns(3)
-
-        # 1. Média do Estado para Inatividade
-        v, d, t = _get_metrics_nivel4("INATIVIDADE", "TTPISEC")
-        m_est_inat = (estado_means or {}).get("INATIVIDADE", 0) # Puxa o valor real do estado
-        with col_k1:
-            st.metric(
-                label="Inatividade", 
-                value=f"{v:.1f} ocorr.", 
-                delta=f"{d:+.1f}% vs Estado", 
-                delta_color="inverse",
-                help=f"Média do Estado: {m_est_inat:.2f} ocorrências por seção." # ---> DICA AQUI
-            )
-            if t: 
-                st.caption(f"**{t}**")
-
-        # 2. Média do Estado para Timeout Biometria
-        v, d, t = _get_metrics_nivel4("TIMEOUT_BIOMETRIA", "TPBSEC")
-        m_est_time = (estado_means or {}).get("TIMEOUT_BIOMETRIA", 0) # Puxa o valor real do estado
-        with col_k2:
-            st.metric(
-                label="Timeout Bio", 
-                value=f"{v:.1f} ocorr.", 
-                delta=f"{d:+.1f}% vs Estado", 
-                delta_color="inverse",
-                help=f"Média do Estado: {m_est_time:.2f} ocorrências por seção." # ---> DICA AQUI
-            )
-            if t: 
-                st.caption(f"**{t}**")
-
-        # 3. Teclas Indevidas (Mantendo o padrão)
-        v, d, _ = _get_metrics_nivel4("TECLA_INDEVIDA")
-        m_est_tecla = (estado_means or {}).get("TECLA_INDEVIDA", 0)
-        with col_k3:
-            st.metric(
-                label="Teclas Indevidas", 
-                value=f"{v:.2f} ocorr.", 
-                delta=f"{d:+.1f}% vs Estado", 
-                delta_color="inverse",
-                help=f"Média do Estado: {m_est_tecla:.2f} ocorrências por seção."
-            )
-            st.caption("Erros de digitação")
-
-        st.write("<br>", unsafe_allow_html=True)
-
-        # 3. GRÁFICOS DEMOGRÁFICOS
-        col_d1, col_d2 = st.columns(2)
-        
-        with col_d1:
-            st.markdown("<h4 style='text-align: center; color: #1a3a5c; font-weight: 600; font-size: 0.95rem;'>Perfil por Faixa Etária (Total Nível 4)</h4>", unsafe_allow_html=True)
-            cols_idade = [c for c in df_secoes.columns if "IDADE_" in c and "Inválido" not in c]
-            sums = df_secoes[cols_idade].sum()
-            fig = go.Figure(go.Bar(
-                x=sums.values, y=[c.replace("IDADE_", "").strip() for c in sums.index],
-                orientation="h", marker_color="#1b5e20",
-            ))
-            fig = apply_base_layout(fig, height=400)
-            fig.update_layout(yaxis=dict(tickfont=dict(color="black", size=13), categoryorder="total ascending"))
-            st.plotly_chart(fig, use_container_width=True)
-            
-        with col_d2:
-            st.markdown("<h4 style='text-align: center; color: #1a3a5c; font-weight: 600; font-size: 0.95rem;'>Perfil por Escolaridade (Total Nível 4)</h4>", unsafe_allow_html=True)
-            cols_esc = [c for c in df_secoes.columns if "ESC_" in c]
-            sums_esc = df_secoes[cols_esc].sum()
-            fig = go.Figure(go.Bar(
-                x=sums_esc.values, y=[c.replace("ESC_", "").title() for c in sums_esc.index],
-                orientation="h", marker_color="#0d47a1",
-            ))
-            fig = apply_base_layout(fig, height=400)
-            fig.update_layout(yaxis=dict(tickfont=dict(color="black", size=13), categoryorder="total ascending"))
-            st.plotly_chart(fig, use_container_width=True)
-
-        # Proporção PCD
-        st.markdown("<br>", unsafe_allow_html=True)
-        _, col_pcd, _ = st.columns([1, 2, 1])
-        with col_pcd:
-            st.markdown("<h4 style='text-align: center; color: #1a3a5c; font-weight: 600; font-size: 0.95rem;'>Proporção de Eleitores PCD (Total Nível 4)</h4>", unsafe_allow_html=True)
-            cols_idade_all = [c for c in df_secoes.columns if "IDADE_" in c]
-            total_votos = df_secoes[cols_idade_all].sum().sum()
-            qtd_pcd = df_secoes.get("QTD_PCD", pd.Series([0])).sum()
-            fig = go.Figure(go.Pie(
-                labels=["PCD", "Não PCD"], values=[qtd_pcd, total_votos - qtd_pcd],
-                hole=0.45, marker=dict(colors=["#d62728", "#bcbd22"]), textinfo="percent+value",
-            ))
-            st.plotly_chart(apply_base_layout(fig, height=400), use_container_width=True)
-
-        # Linha divisória para separar o macro do individual
-        st.markdown("<hr style='margin: 3rem 0; border-top: 2px dashed #dc3545;'>", unsafe_allow_html=True)
-        
-        # 4. CHAMADA DO PRONTUÁRIO INDIVIDUAL
         _render_estudo_caso_nivel4(df_secoes)
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Visão 1 — Comparação entre todos os níveis
@@ -167,14 +63,15 @@ def _render_visao_geral(df: pd.DataFrame) -> None:
             unsafe_allow_html=True,
         )
         m_timeout = df.groupby("STATUS")["TIMEOUT_BIOMETRIA"].mean()
-        
-        # Busca blindada pelo tempo
-        m_tempo = df.groupby("STATUS")["TPBSEC"].mean() if "TPBSEC" in df.columns else pd.Series([0]*len(m_timeout), index=m_timeout.index)
-        
-        text_timeout = [
-            f"{v:.1f} ocorr.<br>(~{int(t)//60}m{int(t)%60}s)"
-            for v, t in zip(m_timeout.values, m_tempo.values)
-        ]
+        if "TPBSEC" in df.columns:
+            m_tempo = df.groupby("STATUS")["TPBSEC"].mean()
+            text_timeout = [
+                f"{v:.1f} ocorr. (~{int(t)//60}m{int(t)%60}s)"
+                for v, t in zip(m_timeout.values, m_tempo.values)
+            ]
+            del m_tempo
+        else:
+            text_timeout = [f"{v:.1f} ocorr." for v in m_timeout.values]
 
         fig = go.Figure(go.Bar(
             x=m_timeout.values,
@@ -187,7 +84,7 @@ def _render_visao_geral(df: pd.DataFrame) -> None:
         fig = apply_base_layout(fig, height=350)
         fig.update_layout(yaxis=dict(tickfont=dict(color="black", size=13)))
         st.plotly_chart(fig, use_container_width=True)
-        del m_timeout, m_tempo, fig
+        del m_timeout, fig
 
     with col_v2:
         st.markdown(
@@ -196,14 +93,15 @@ def _render_visao_geral(df: pd.DataFrame) -> None:
             unsafe_allow_html=True,
         )
         m_inat = df.groupby("STATUS")["INATIVIDADE"].mean()
-        
-        # Busca blindada pelo tempo
-        m_t_inat = df.groupby("STATUS")["TTPISEC"].mean() if "TTPISEC" in df.columns else pd.Series([0]*len(m_inat), index=m_inat.index)
-        
-        text_inat = [
-            f"{v:.1f} ocorr.<br>(~{int(t)//60}m{int(t)%60}s)"
-            for v, t in zip(m_inat.values, m_t_inat.values)
-        ]
+        if "TTPISEC" in df.columns:
+            m_t_inat = df.groupby("STATUS")["TTPISEC"].mean()
+            text_inat = [
+                f"{v:.1f} ocorr. (~{int(t)//60}m{int(t)%60}s)"
+                for v, t in zip(m_inat.values, m_t_inat.values)
+            ]
+            del m_t_inat
+        else:
+            text_inat = [f"{v:.1f} ocorr." for v in m_inat.values]
 
         fig = go.Figure(go.Bar(
             x=m_inat.values,
@@ -216,7 +114,7 @@ def _render_visao_geral(df: pd.DataFrame) -> None:
         fig = apply_base_layout(fig, height=350)
         fig.update_layout(yaxis=dict(tickfont=dict(color="black", size=13)))
         st.plotly_chart(fig, use_container_width=True)
-        del m_inat, m_t_inat, fig
+        del m_inat, fig
 
     col_p1, col_p2 = st.columns(2)
 
@@ -258,6 +156,7 @@ def _render_visao_geral(df: pd.DataFrame) -> None:
 
     gc.collect()
 
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Visão 2 — Diagnóstico detalhado de um nível específico (0–3)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -272,6 +171,12 @@ def _render_detalhamento_nivel(
         <div class="section-desc">Análise comparativa do nível selecionado contra a média estadual (todas as seções críticas).</div>
     """, unsafe_allow_html=True)
 
+            # NOTA: nível 0 removido do filtro. Código original comentado:
+        # titulo = (
+        #     f"Detalhamento: {STATUS_LABELS.get(status_filter, f'Nível {status_filter}')}"
+        #     if status_filter > 0
+        #     else "Urnas Sem Atraso (Nível 0)"
+        # )
     titulo = f"Detalhamento: {STATUS_LABELS.get(status_filter, f'Nível {status_filter}')}"
     st.markdown(
         f"<h3 style='color: #1a3a5c; font-weight: 600; margin-bottom: 1rem;'>{titulo}</h3>",
@@ -281,16 +186,14 @@ def _render_detalhamento_nivel(
     # ── KPIs com delta vs média estadual ─────────────────────────────────────
     def _get_metrics(col_ocorr: str, col_tempo: str | None = None):
         m_niv = df[col_ocorr].mean()
+        # Usa média estadual pré-computada (sobre todas as seções críticas).
+        # Recai no próprio DF apenas se estado_means não tiver a coluna.
         m_est = estado_means.get(col_ocorr, m_niv)
         delta = ((m_niv / m_est) - 1) * 100 if m_est > 0 else 0
         tempo_str = ""
-        
-        # Força o resgate do tempo mesmo se houver falha de formatação
-        if col_tempo:
-            seg = df.get(col_tempo, pd.Series([0])).mean()
-            if pd.notna(seg):
-                tempo_str = f"Tempo total: ~{int(seg)//60}m {int(seg)%60}s"
-                
+        if col_tempo and col_tempo in df.columns:
+            seg = df[col_tempo].mean()
+            tempo_str = f"Tempo total: ~{int(seg)//60}m {int(seg)%60}s"
         return m_niv, delta, tempo_str
 
     col_k1, col_k2, col_k3 = st.columns(3)
@@ -298,12 +201,12 @@ def _render_detalhamento_nivel(
     v, d, t = _get_metrics("INATIVIDADE", "TTPISEC")
     with col_k1:
         st.metric("Inatividade", f"{v:.1f} ocorr.", f"{d:+.1f}% vs Estado", delta_color="inverse")
-        if t: st.caption(f"**{t}**") # Negrito para destacar bem
+        st.caption(t)
 
     v, d, t = _get_metrics("TIMEOUT_BIOMETRIA", "TPBSEC")
     with col_k2:
         st.metric("Timeout Bio", f"{v:.1f} ocorr.", f"{d:+.1f}% vs Estado", delta_color="inverse")
-        if t: st.caption(f"**{t}**")
+        st.caption(t)
 
     v, d, _ = _get_metrics("TECLA_INDEVIDA")
     with col_k3:
@@ -381,6 +284,7 @@ def _render_detalhamento_nivel(
 
     gc.collect()
 
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Visão 3 — Estudo de caso nível 4 (supercríticas)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -452,15 +356,14 @@ def _render_estudo_caso_nivel4(df: pd.DataFrame) -> None:
         valores_op = [urna[m] for m in metricas]
         textos = []
         for m, v in zip(metricas, valores_op):
-            if m == "TIMEOUT_BIOMETRIA":
-                t = urna.get("TPBSEC", 0) # Usa get() para não quebrar
+            if m == "TIMEOUT_BIOMETRIA" and "TPBSEC" in df_sorted.columns:
+                t = urna["TPBSEC"]
                 textos.append(f"{int(v)} ocorr.<br>(~{int(t)//60}m{int(t)%60}s)")
-            elif m == "INATIVIDADE":
-                t = urna.get("TTPISEC", 0) # Usa get() para não quebrar
+            elif m == "INATIVIDADE" and "TTPISEC" in df_sorted.columns:
+                t = urna["TTPISEC"]
                 textos.append(f"{int(v)} ocorr.<br>(~{int(t)//60}m{int(t)%60}s)")
             else:
                 textos.append(f"{int(v)} ocorr.")
-                
         fig = go.Figure(go.Bar(
             x=labels_op, y=valores_op,
             marker_color=["#ff7f0e", "#1f77b4", "#d62728"],

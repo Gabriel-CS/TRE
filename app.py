@@ -249,7 +249,7 @@ def _load_estado_means(nivel_all_path: str) -> dict[str, float]:
     """Lê apenas 3 colunas do CSV 'all' para calcular médias estaduais."""
     cols = ["TIMEOUT_BIOMETRIA", "INATIVIDADE", "TECLA_INDEVIDA"]
     try:
-        df = pd.read_csv(nivel_all_path, sep=";", encoding="utf-8", usecols=cols)
+        df = pd.read_csv(nivel_all_path, sep=",", encoding="utf-8", usecols=cols)
         return {c: float(df[c].mean()) for c in cols}
     except Exception:
         return {}
@@ -505,7 +505,6 @@ with st.spinner("Carregando dados..."):
     if status_filter is not None:
         if os.path.exists(n_all_path):
             estado_means = _load_estado_means(n_all_path)
-            st.sidebar.write("ESPIÃO - Médias do Estado:", estado_means)
 
 # Constrói a análise a partir dos DataFrames já em RAM (zero I/O adicional)
 analise = UrnasCriticasAnalysis.from_dataframes(
