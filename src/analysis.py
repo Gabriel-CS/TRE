@@ -14,6 +14,14 @@ OKABE_ITO: list[str] = [
 ]
 
 MODEL_COLOR: dict[str, str] = dict(zip(URN_MODELS, OKABE_ITO))
+STATUS_LABELS: dict[int, str] = {
+    0: "Sem Atraso",
+    1: "Normal",
+    2: "Atenção",
+    3: "Crítico",
+    4: "Super Crítica",
+}
+
 
 COLS_LOG: list[str] = [
     "zona", "secao", "modelo", "t_intervalo_s", "n_tit_invalidos",
@@ -66,19 +74,93 @@ GRUPOS_ETARIOS: dict[str, list[str]] = {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Helpers de normalização de colunas
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _normalizar_colunas_zona_secao(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Detecta e renomeia colunas de zona/seção para o padrão NR_ZONA / NR_SECAO.
+    Tenta variações comuns de nomenclatura (zona/secao, ZONA/SECAO, etc.).
+    """
+    import warnings
+
+    # Cria um dicionário: nome_upper_sem_espaco -> nome_original
+    cols_upper = {c.upper().strip().replace(" ", "_"): c for c in df.columns}
+
+    # Mapeamento: nome padrão -> possíveis variações (upper, sem espaço)
+    candidatos = {
+        "NR_ZONA":  ["NR_ZONA", "ZONA", "COD_ZONA", "CD_ZONA", "NUM_ZONA", "NR_ZONA_ELEITORAL", "ZONA_ELEITORAL"],
+        "NR_SECAO": ["NR_SECAO", "SECAO", "COD_SECAO", "CD_SECAO", "NUM_SECAO", "SEÇÃO", "NR_SEÇÃO", "NR_SECAO_ELEITORAL", "SECAO_ELEITORAL", "SEÇÃO_ELEITORAL"],
+    }
+
+    renames = {}
+    for padrao, alternativas in candidatos.items():
+        if padrao in df.columns:
+            continue  # já existe com nome correto
+        for alt in alternativas:
+            alt_norm = alt.upper().strip().replace(" ", "_")
+            if alt_norm in cols_upper:
+                renames[cols_upper[alt_norm]] = padrao
+                break
+
+    if renames:
+        df = df.rename(columns=renames)
+
+    # Se mesmo assim não achou, tenta fuzzy: qualquer coluna que contenha 'ZON' e 'NR'
+    if "NR_ZONA" not in df.columns:
+        for c in df.columns:
+            c_upper = c.upper().strip()
+            if "ZON" in c_upper and ("NR" in c_upper or "NUM" in c_upper or "COD" in c_upper):
+                df = df.rename(columns={c: "NR_ZONA"})
+                break
+            elif c_upper in ("ZONA", "ZONA_ELEITORAL"):
+                df = df.rename(columns={c: "NR_ZONA"})
+                break
+
+    if "NR_SECAO" not in df.columns:
+        for c in df.columns:
+            c_upper = c.upper().strip()
+            if "SEC" in c_upper and ("NR" in c_upper or "NUM" in c_upper or "COD" in c_upper):
+                df = df.rename(columns={c: "NR_SECAO"})
+                break
+            elif c_upper in ("SECAO", "SEÇÃO", "SECAO_ELEITORAL", "SEÇÃO_ELEITORAL"):
+                df = df.rename(columns={c: "NR_SECAO"})
+                break
+
+    # Fallback extremo: se ainda não achou NR_SECAO, tenta qualquer coluna com "SEC"
+    if "NR_SECAO" not in df.columns:
+        for c in df.columns:
+            if "SEC" in c.upper():
+                warnings.warn(f"NR_SECAO não encontrada. Usando '{c}' como NR_SECAO.")
+                df = df.rename(columns={c: "NR_SECAO"})
+                break
+
+    # Fallback extremo: se ainda não achou NR_ZONA, tenta qualquer coluna com "ZON"
+    if "NR_ZONA" not in df.columns:
+        for c in df.columns:
+            if "ZON" in c.upper():
+                warnings.warn(f"NR_ZONA não encontrada. Usando '{c}' como NR_ZONA.")
+                df = df.rename(columns={c: "NR_ZONA"})
+                break
+
+    return df
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Classe principal
 # ──────────────────────────────────────────────────────────────────────────────
 
 class UrnasCriticasAnalysis:
     """Calcula todas as métricas referentes às urnas críticas."""
-
     # ── Construtores ──────────────────────────────────────────────────────────
 
     def __init__(
         self,
         path_consolidado: str,
         path_urnas_completas: str,
-        status_filter: int | None = None,  # None => >0 (críticas); 0,1,2,3,4 => específico
+        status_filter: int | None = None,
+        prefiltered: bool = False,
+        total_secoes_override: int | None = None,
     ) -> None:
         df_2022 = pd.read_csv(
             path_consolidado, sep=",", encoding="utf-8", compression="zip"
@@ -87,7 +169,8 @@ class UrnasCriticasAnalysis:
             path_urnas_completas, sep=";", encoding="utf-8", compression="zip"
         )
         self.status_filter = status_filter
-        self._prepare(df_2022, df_completas)
+        self._total_secoes_override = total_secoes_override
+        self._prepare(df_2022, df_completas, prefiltered=prefiltered)
 
     @classmethod
     def from_dataframes(
@@ -95,28 +178,77 @@ class UrnasCriticasAnalysis:
         df_2022: pd.DataFrame,
         df_completas: pd.DataFrame,
         status_filter: int | None = None,
+        prefiltered: bool = False,
+        total_secoes_override: int | None = None,
     ) -> "UrnasCriticasAnalysis":
+        """Constrói a análise a partir de DataFrames já carregados em memória."""
         obj = object.__new__(cls)
         obj.status_filter = status_filter
-        obj._prepare(df_2022, df_completas)
+        obj._total_secoes_override = total_secoes_override
+        obj._prepare(df_2022, df_completas, prefiltered=prefiltered)
         return obj
 
     # ── Preparação interna ────────────────────────────────────────────────────
 
-    def _prepare(self, df_2022: pd.DataFrame, df_completas: pd.DataFrame) -> None:
-        # 1. Filtrar seções conforme status_filter
-        if self.status_filter is None:
-            df_criticas = df_completas[df_completas["STATUS"] > 0].copy()
+    def _prepare(
+        self,
+        df_2022: pd.DataFrame,
+        df_completas: pd.DataFrame,
+        prefiltered: bool = False,
+    ) -> None:
+        # 0. Normalização robusta de nomes de colunas de localização
+        #    Usa a função _normalizar_colunas_zona_secao para garantir
+        #    que ambos os DataFrames tenham NR_ZONA / NR_SECAO.
+
+        # Debug: mostrar colunas originais
+        import warnings
+        if "NR_SECAO" not in df_completas.columns and "SECAO" not in df_completas.columns:
+            warnings.warn(f"[DEBUG] Colunas em df_completas antes da normalização: {list(df_completas.columns)}")
+
+        df_completas = _normalizar_colunas_zona_secao(df_completas)
+        df_2022 = _normalizar_colunas_zona_secao(df_2022)
+
+        # Debug: mostrar colunas após normalização
+        if "NR_SECAO" not in df_completas.columns:
+            warnings.warn(f"[DEBUG] Colunas em df_completas APÓS normalização: {list(df_completas.columns)}")
+            # Fallback último recurso: se só tem NR_ZONA, cria NR_SECAO como cópia
+            if "NR_ZONA" in df_completas.columns:
+                warnings.warn("[DEBUG] Criando NR_SECAO como cópia de NR_ZONA (fallback)")
+                df_completas["NR_SECAO"] = df_completas["NR_ZONA"].astype(str) + "_sec"
+        # df_2022 precisa de zona/secao (sem NR_) para o log de votantes
+        if "NR_ZONA" in df_2022.columns and "zona" not in df_2022.columns:
+            df_2022 = df_2022.rename(columns={"NR_ZONA": "zona", "NR_SECAO": "secao"})
+
+        # 1. Filtrar seções conforme status_filter (pulado se já pré-filtrado)
+        if prefiltered:
+            df_criticas = df_completas.copy()
         else:
-            df_criticas = df_completas[df_completas["STATUS"] == self.status_filter].copy()
+            if self.status_filter is None:
+                df_criticas = df_completas[df_completas["STATUS"] > 0].copy()
+            else:
+                df_criticas = df_completas[
+                    df_completas["STATUS"] == self.status_filter
+                ].copy()
 
-        # limpar espaços nos nomes das colunas IDADE_
+        # Limpar espaços nos nomes das colunas IDADE_
         idade_raw = [c for c in df_criticas.columns if c.startswith("IDADE_")]
-        df_criticas = df_criticas.rename(
-            columns={c: c.strip() for c in idade_raw}
-        )
+        df_criticas = df_criticas.rename(columns={c: c.strip() for c in idade_raw})
 
-        # 2. Incorporar modelo de urna
+        # 2. Incorporar modelo de urna (df_2022 deve ter zona/secao/modelo)
+        # Garantir que df_2022 tenha zona/secao (sem NR_) para o log de votantes
+        if "NR_ZONA" in df_2022.columns and "zona" not in df_2022.columns:
+            df_2022 = df_2022.rename(columns={"NR_ZONA": "zona", "NR_SECAO": "secao"})
+
+        # Verificar colunas obrigatórias
+        if "zona" not in df_2022.columns:
+            raise KeyError(f"Coluna 'zona' não encontrada em df_2022. Colunas disponíveis: {list(df_2022.columns)}")
+        if "secao" not in df_2022.columns:
+            raise KeyError(f"Coluna 'secao' não encontrada em df_2022. Colunas disponíveis: {list(df_2022.columns)}")
+        if "NR_ZONA" not in df_criticas.columns:
+            raise KeyError(f"Coluna 'NR_ZONA' não encontrada em df_criticas. Colunas disponíveis: {list(df_criticas.columns)}")
+        if "NR_SECAO" not in df_criticas.columns:
+            raise KeyError(f"Coluna 'NR_SECAO' não encontrada em df_criticas. Colunas disponíveis: {list(df_criticas.columns)}")
+
         df_modelo_secao = (
             df_2022[["zona", "secao", "modelo"]]
             .drop_duplicates(subset=["zona", "secao"])
@@ -159,17 +291,28 @@ class UrnasCriticasAnalysis:
     # ── KPIs de topo ─────────────────────────────────────────────────────────
 
     def get_overview(self) -> dict:
-        """Retorna métricas resumidas para os cards do dashboard."""
+        """Retorna métricas resumidas para os cards do dashboard.
+
+        Quando ``total_secoes_override`` foi fornecido (modo pré-filtrado),
+        usa esse valor como total global em vez de ``len(self.df_completas)``.
+        """
+        # Total global: override quando disponível (CSV pré-filtrado)
+        total_secoes = (
+            self._total_secoes_override
+            if self._total_secoes_override is not None
+            else len(self.df_completas)
+        )
+
         status_counts = (
             self.df_completas["STATUS"]
             .value_counts()
             .sort_index()
-            .rename({0: "Não crítica", 1: "Crítica leve", 2: "Crítica", 3: "Crítica alta", 4: "Crítica máx"})
+            .rename(STATUS_LABELS)
             .to_dict()
         )
         return {
             "total_secoes_criticas": len(self.df_criticas),
-            "total_secoes":          len(self.df_completas),
+            "total_secoes":          total_secoes,
             "total_votantes":        len(self.df_log),
             "modelos_presentes":     [m for m in URN_MODELS if len(self.models[m]) > 0],
             "status_counts":         status_counts,
@@ -178,12 +321,11 @@ class UrnasCriticasAnalysis:
     # ── 1. Distribuição de modelos ────────────────────────────────────────────
 
     def get_model_distribution(self) -> dict:
-        """Contagens e proporções de seções críticas por modelo."""
         counts = [len(self.models[m]) for m in URN_MODELS]
         total  = sum(counts) or 1
         return {
-            "models":     URN_MODELS,
-            "counts":     counts,
+            "models":      URN_MODELS,
+            "counts":      counts,
             "proportions": [c / total for c in counts],
         }
 
@@ -197,14 +339,6 @@ class UrnasCriticasAnalysis:
             taxa  = (bio_m["n_falhas_bio"] > 0).sum() / len(bio_m) if len(bio_m) else 0
             rates.append(taxa)
         return {"models": URN_MODELS, "rates": rates}
-
-    # ── 3. Autenticação manual (COMENTADO — descomente se necessário) ─────────
-    # def get_manual_auth_rates(self) -> dict:
-    #     rates = [
-    #         self.voters[m]["hab_manual"].mean() if len(self.voters[m]) else 0
-    #         for m in URN_MODELS
-    #     ]
-    #     return {"models": URN_MODELS, "rates": rates}
 
     # ── 4. Tempo de fila ─────────────────────────────────────────────────────
 
@@ -229,7 +363,6 @@ class UrnasCriticasAnalysis:
     # ── 6. Tempo de inatividade ───────────────────────────────────────────────
 
     def get_inactivity_times(self) -> dict:
-        """Média e desvio padrão do tempo de inatividade durante a seção (excluindo zeros)."""
         means, stds = [], []
         for m in URN_MODELS:
             d = self.voters[m][self.voters[m]["t_inatividade_s"] > 0]["t_inatividade_s"]
@@ -251,7 +384,6 @@ class UrnasCriticasAnalysis:
     # ── 8. Escolaridade ───────────────────────────────────────────────────────
 
     def get_education_distribution(self) -> dict:
-        """DataFrame com distribuição de escolaridade (proporções) por modelo."""
         esc_cols_available = [c for c in ESC_COLS if c in self.df_criticas.columns]
         df_esc = pd.DataFrame(
             {m: self.secao[m][esc_cols_available].sum() for m in URN_MODELS}
@@ -266,9 +398,8 @@ class UrnasCriticasAnalysis:
         }
 
     def get_low_education(self) -> dict:
-        """Proporção de eleitores de baixa escolaridade por modelo."""
-        baixa_available = [c for c in BAIXA_ESC   if c in self.df_criticas.columns]
-        esc_available   = [c for c in ESC_COLS     if c in self.df_criticas.columns]
+        baixa_available = [c for c in BAIXA_ESC if c in self.df_criticas.columns]
+        esc_available   = [c for c in ESC_COLS   if c in self.df_criticas.columns]
         props = []
         for m in URN_MODELS:
             sm  = self.secao[m]
@@ -297,7 +428,9 @@ class UrnasCriticasAnalysis:
     def get_elderly_proportion(self) -> dict:
         age = self.get_age_distribution()
         df  = age["df_proportions"]
-        idoso_pct = (df.get("Idoso (60-74)", 0) + df.get("Muito idoso (75+)", 0)).values.tolist()
+        idoso_pct = (
+            df.get("Idoso (60-74)", 0) + df.get("Muito idoso (75+)", 0)
+        ).values.tolist()
         return {"models": URN_MODELS, "proportions": idoso_pct}
 
     # ── 10. Eleitores PCD ────────────────────────────────────────────────────
@@ -306,18 +439,17 @@ class UrnasCriticasAnalysis:
         totals, eleitores, taxas = [], [], []
         for m in URN_MODELS:
             sm = self.secao[m]
-            p  = sm["QTD_PCD"].sum()             if "QTD_PCD"               in sm.columns else 0
+            p  = sm["QTD_PCD"].sum()              if "QTD_PCD"               in sm.columns else 0
             t  = sm["QTD_PERFIL_BIOMETRIA"].sum() if "QTD_PERFIL_BIOMETRIA" in sm.columns else 0
             totals.append(int(p))
             eleitores.append(int(t))
             taxas.append(p / t if t else 0.0)
         return {"models": URN_MODELS, "totals": totals, "eleitores": eleitores, "taxas": taxas}
 
-    # ── 11. Tabela resumo operacional ─────────────────────────────────────────
+    # ── 11. Tabelas resumo ────────────────────────────────────────────────────
 
     def get_operational_summary(self) -> pd.DataFrame:
         bio  = self.get_bio_failure_rates()
-        # man  = self.get_manual_auth_rates()  # COMENTADO
         fila = self.get_queue_times()
         auth = self.get_auth_duration()
         inat = self.get_inactivity_times()
@@ -325,14 +457,13 @@ class UrnasCriticasAnalysis:
         for i, m in enumerate(URN_MODELS):
             vm = self.voters[m]
             rows.append({
-                "Modelo":       m,
-                "Seções":       len(self.models[m]),
-                "Votantes":     len(vm),
-                "Falha Bio (%)":   round(bio["rates"][i]  * 100, 1),
-                # "Hab. Manual (%)": round(man["rates"][i]  * 100, 1),  # COMENTADO
-                "T. Fila (s)":     round(fila["means"][i], 1),
-                "T. Auth (s)":     round(auth["means"][i], 1),
-                "T. Inatividade (s)": round(inat["means"][i], 1),
+                "Modelo":                m,
+                "Seções":                len(self.models[m]),
+                "Votantes":              len(vm),
+                "Falha Bio (%)":         round(bio["rates"][i]  * 100, 1),
+                "T. Fila (s)":           round(fila["means"][i], 1),
+                "T. Auth (s)":           round(auth["means"][i], 1),
+                "T. Inatividade (s)":    round(inat["means"][i], 1),
             })
         return pd.DataFrame(rows)
 
@@ -340,9 +471,9 @@ class UrnasCriticasAnalysis:
         pcd = self.get_pcd_stats()
         rows = [
             {
-                "Modelo":    m,
-                "PCD Total": pcd["totals"][i],
-                "Eleitores": pcd["eleitores"][i],
+                "Modelo":      m,
+                "PCD Total":   pcd["totals"][i],
+                "Eleitores":   pcd["eleitores"][i],
                 "Taxa PCD (%)": round(pcd["taxas"][i] * 100, 2),
             }
             for i, m in enumerate(URN_MODELS)
