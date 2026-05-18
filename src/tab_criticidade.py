@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from src.analysis import OKABE_ITO, STATUS_LABELS
+from src.analysis import OKABE_ITO, STATUS_LABELS, STATUS_PALETTE
 from src.charts import apply_base_layout
 
 
@@ -20,17 +20,6 @@ def render_tab_criticidade(
     estado_means: dict | None = None,
 ) -> None:
     """Renderiza o conteúdo completo da aba 'Análise por Criticidade'.
-
-    Parâmetros
-    ──────────
-    df_secoes : DataFrame
-        ``analise.df_criticas`` — seções já filtradas pelo nível selecionado.
-    status_filter : int | None
-        Nível de criticidade selecionado globalmente.
-    estado_means : dict | None
-        Médias estaduais globais (todas as seções críticas) para as colunas
-        TIMEOUT_BIOMETRIA, INATIVIDADE e TECLA_INDEVIDA.  Necessário
-        apenas para o "Diagnóstico Detalhado" (status 0–3).
     """
     if df_secoes is None or df_secoes.empty:
         st.error("Dados de seções não disponíveis para este filtro.")
@@ -41,6 +30,124 @@ def render_tab_criticidade(
     elif status_filter in [0, 1, 2, 3]:
         _render_detalhamento_nivel(df_secoes, status_filter, estado_means or {})
     elif status_filter == 4:
+  
+        # TÍTULOS DA SEÇÃO
+        st.markdown("""
+            <div class="section-header"><h2>Diagnóstico Detalhado por Nível</h2></div>
+            <div class="section-desc">Análise comparativa do nível selecionado contra a média estadual.</div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown(
+            "<h3 style='color: #1a3a5c; font-weight: 600; margin-bottom: 1rem;'>Detalhamento: Urnas Super Críticas (Nível 4)</h3>",
+            unsafe_allow_html=True,
+        )
+        
+        # 1. FUNÇÃO COM BUSCA BLINDADA (Força o tempo a aparecer mesmo sem a coluna)
+        def _get_metrics_nivel4(col_ocorr: str, col_tempo: str | None = None):
+            m_niv = df_secoes[col_ocorr].mean() if col_ocorr in df_secoes.columns else 0
+            m_est = (estado_means or {}).get(col_ocorr, m_niv)
+            delta = ((m_niv / m_est) - 1) * 100 if m_est > 0 else 0
+            
+            tempo_str = ""
+            if col_tempo:
+                seg = df_secoes.get(col_tempo, pd.Series([0])).mean()
+                if pd.notna(seg):
+                    tempo_str = f"Tempo total: ~{int(seg)//60}m {int(seg)%60}s"
+            return m_niv, delta, tempo_str
+
+        # Renderizando os 3 Cartões de Métricas (KPIs)
+       # Renderizando os 3 Cartões de Métricas (KPIs) com Dica Visual (Tooltip)
+        col_k1, col_k2, col_k3 = st.columns(3)
+
+        # 1. Média do Estado para Inatividade
+        v, d, t = _get_metrics_nivel4("INATIVIDADE", "TTPISEC")
+        m_est_inat = (estado_means or {}).get("INATIVIDADE", 0) # Puxa o valor real do estado
+        with col_k1:
+            st.metric(
+                label="Inatividade", 
+                value=f"{v:.1f} ocorr.", 
+                delta=f"{d:+.1f}% vs Estado", 
+                delta_color="inverse",
+                help=f"Média do Estado: {m_est_inat:.2f} ocorrências por seção." # ---> DICA AQUI
+            )
+            if t: 
+                st.caption(f"**{t}**")
+
+        # 2. Média do Estado para Timeout Biometria
+        v, d, t = _get_metrics_nivel4("TIMEOUT_BIOMETRIA", "TPBSEC")
+        m_est_time = (estado_means or {}).get("TIMEOUT_BIOMETRIA", 0) # Puxa o valor real do estado
+        with col_k2:
+            st.metric(
+                label="Timeout Bio", 
+                value=f"{v:.1f} ocorr.", 
+                delta=f"{d:+.1f}% vs Estado", 
+                delta_color="inverse",
+                help=f"Média do Estado: {m_est_time:.2f} ocorrências por seção." # ---> DICA AQUI
+            )
+            if t: 
+                st.caption(f"**{t}**")
+
+        # 3. Teclas Indevidas (Mantendo o padrão)
+        v, d, _ = _get_metrics_nivel4("TECLA_INDEVIDA")
+        m_est_tecla = (estado_means or {}).get("TECLA_INDEVIDA", 0)
+        with col_k3:
+            st.metric(
+                label="Teclas Indevidas", 
+                value=f"{v:.2f} ocorr.", 
+                delta=f"{d:+.1f}% vs Estado", 
+                delta_color="inverse",
+                help=f"Média do Estado: {m_est_tecla:.2f} ocorrências por seção."
+            )
+            st.caption("Erros de digitação")
+
+        st.write("<br>", unsafe_allow_html=True)
+
+
+        # 3. GRÁFICOS DEMOGRÁFICOS
+        col_d1, col_d2 = st.columns(2)
+        
+        with col_d1:
+            st.markdown("<h4 style='text-align: center; color: #1a3a5c; font-weight: 600; font-size: 0.95rem;'>Perfil por Faixa Etária (Total Nível 4)</h4>", unsafe_allow_html=True)
+            cols_idade = [c for c in df_secoes.columns if "IDADE_" in c and "Inválido" not in c]
+            sums = df_secoes[cols_idade].sum()
+            fig = go.Figure(go.Bar(
+                x=sums.values, y=[c.replace("IDADE_", "").strip() for c in sums.index],
+                orientation="h", marker_color="#1b5e20",
+            ))
+            fig = apply_base_layout(fig, height=400)
+            fig.update_layout(yaxis=dict(tickfont=dict(color="black", size=13), categoryorder="total ascending"))
+            st.plotly_chart(fig, use_container_width=True)
+            
+        with col_d2:
+            st.markdown("<h4 style='text-align: center; color: #1a3a5c; font-weight: 600; font-size: 0.95rem;'>Perfil por Escolaridade (Total Nível 4)</h4>", unsafe_allow_html=True)
+            cols_esc = [c for c in df_secoes.columns if "ESC_" in c]
+            sums_esc = df_secoes[cols_esc].sum()
+            fig = go.Figure(go.Bar(
+                x=sums_esc.values, y=[c.replace("ESC_", "").title() for c in sums_esc.index],
+                orientation="h", marker_color="#0d47a1",
+            ))
+            fig = apply_base_layout(fig, height=400)
+            fig.update_layout(yaxis=dict(tickfont=dict(color="black", size=13), categoryorder="total ascending"))
+            st.plotly_chart(fig, use_container_width=True)
+
+        # Proporção PCD
+        st.markdown("<br>", unsafe_allow_html=True)
+        _, col_pcd, _ = st.columns([1, 2, 1])
+        with col_pcd:
+            st.markdown("<h4 style='text-align: center; color: #1a3a5c; font-weight: 600; font-size: 0.95rem;'>Proporção de Eleitores PCD (Total Nível 4)</h4>", unsafe_allow_html=True)
+            cols_idade_all = [c for c in df_secoes.columns if "IDADE_" in c]
+            total_votos = df_secoes[cols_idade_all].sum().sum()
+            qtd_pcd = df_secoes.get("QTD_PCD", pd.Series([0])).sum()
+            fig = go.Figure(go.Pie(
+                labels=["PCD", "Não PCD"], values=[qtd_pcd, total_votos - qtd_pcd],
+                hole=0.45, marker=dict(colors=["#d62728", "#bcbd22"]), textinfo="percent+value",
+            ))
+            st.plotly_chart(apply_base_layout(fig, height=400), use_container_width=True)
+
+        # Linha divisória para separar o macro do individual
+        st.markdown("<hr style='margin: 3rem 0; border-top: 2px dashed #dc3545;'>", unsafe_allow_html=True)
+        
+        # 4. CHAMADA DO PRONTUÁRIO INDIVIDUAL
         _render_estudo_caso_nivel4(df_secoes)
 
 
@@ -77,7 +184,7 @@ def _render_visao_geral(df: pd.DataFrame) -> None:
             x=m_timeout.values,
             y=[STATUS_LABELS.get(int(s), f"Nível {int(s)}") for s in m_timeout.index],
             orientation="h",
-            marker_color=OKABE_ITO,
+            marker_color=[STATUS_PALETTE.get(int(s), "#6c757d") for s in m_timeout.index],
             text=text_timeout,
             textposition="outside",
         ))
@@ -107,7 +214,7 @@ def _render_visao_geral(df: pd.DataFrame) -> None:
             x=m_inat.values,
             y=[STATUS_LABELS.get(int(s), f"Nível {int(s)}") for s in m_inat.index],
             orientation="h",
-            marker_color=OKABE_ITO,
+            marker_color=[STATUS_PALETTE.get(int(s), "#6c757d") for s in m_inat.index],
             text=text_inat,
             textposition="outside",
         ))
@@ -129,7 +236,7 @@ def _render_visao_geral(df: pd.DataFrame) -> None:
             labels=[STATUS_LABELS.get(int(s), f"Nível {int(s)}") for s in pcd_sum.index],
             values=pcd_sum.values,
             hole=0.45,
-            marker=dict(colors=OKABE_ITO),
+            marker=dict(colors=[STATUS_PALETTE.get(int(s), "#6c757d") for s in pcd_sum.index]),
         ))
         st.plotly_chart(apply_base_layout(fig, height=350), use_container_width=True)
         del pcd_sum, fig
@@ -145,7 +252,7 @@ def _render_visao_geral(df: pd.DataFrame) -> None:
             x=m_teclas.values,
             y=[STATUS_LABELS.get(int(s), f"Nível {int(s)}") for s in m_teclas.index],
             orientation="h",
-            marker_color=OKABE_ITO,
+            marker_color=[STATUS_PALETTE.get(int(s), "#6c757d") for s in m_teclas.index],
             text=[f"{v:.2f}" for v in m_teclas.values],
             textposition="outside",
         ))
@@ -230,7 +337,7 @@ def _render_detalhamento_nivel(
             x=sums.values,
             y=[c.replace("IDADE_", "").strip() for c in sums.index],
             orientation="h",
-            marker_color="#1b5e20",
+            marker_color=STATUS_PALETTE.get(status_filter, "#0EA5E9"),
         ))
         fig = apply_base_layout(fig, height=400)
         fig.update_layout(yaxis=dict(
@@ -251,7 +358,7 @@ def _render_detalhamento_nivel(
             x=sums_esc.values,
             y=[c.replace("ESC_", "").title() for c in sums_esc.index],
             orientation="h",
-            marker_color="#0d47a1",
+            marker_color=STATUS_PALETTE.get(status_filter, "#0EA5E9"),
         ))
         fig = apply_base_layout(fig, height=400)
         fig.update_layout(yaxis=dict(
@@ -276,7 +383,7 @@ def _render_detalhamento_nivel(
             labels=["PCD", "Não PCD"],
             values=[qtd_pcd, total_votos - qtd_pcd],
             hole=0.45,
-            marker=dict(colors=["#d62728", "#bcbd22"]),
+            marker=dict(colors=["#EF4444", "#CBD5E1"]),
             textinfo="percent+value",
         ))
         st.plotly_chart(apply_base_layout(fig, height=400), use_container_width=True)
@@ -332,8 +439,8 @@ def _render_estudo_caso_nivel4(df: pd.DataFrame) -> None:
     cols_esc   = [c for c in df_sorted.columns if c.startswith("ESC_")]
 
     st.markdown(f"""
-        <div style="background: #f8d7da; padding: 1rem 1.25rem; border-radius: 8px;
-                    border-left: 4px solid #dc3545; margin-bottom: 1.25rem;">
+        <div style="background: #fee2e2; padding: 1rem 1.25rem; border-radius: 8px;
+                    border-left: 4px solid #EF4444; margin-bottom: 1.25rem;">
             <h3 style="color: #721c24; margin-top: 0; font-size: 1.1rem; font-weight: 700;">
                 Prontuário: {urna['NM_MUNICIPIO']} (Z: {urna['NR_ZONA']} | S: {urna['NR_SECAO']})
             </h3>
@@ -366,7 +473,7 @@ def _render_estudo_caso_nivel4(df: pd.DataFrame) -> None:
                 textos.append(f"{int(v)} ocorr.")
         fig = go.Figure(go.Bar(
             x=labels_op, y=valores_op,
-            marker_color=["#ff7f0e", "#1f77b4", "#d62728"],
+            marker_color=["#F97316", "#0EA5E9", "#EF4444"],
             text=textos, textposition="outside",
         ))
         fig = apply_base_layout(fig, height=350)
@@ -392,7 +499,7 @@ def _render_estudo_caso_nivel4(df: pd.DataFrame) -> None:
         fig = go.Figure(go.Bar(
             x=vals_idade,
             y=[c.replace("IDADE_", "").strip() for c in cols_idade],
-            orientation="h", marker_color="#2ca02c",
+            orientation="h", marker_color="#0EA5E9",
             text=textos_idade, textposition="outside",
         ))
         fig = apply_base_layout(fig, height=350)
@@ -418,7 +525,7 @@ def _render_estudo_caso_nivel4(df: pd.DataFrame) -> None:
         fig = go.Figure(go.Bar(
             x=vals_esc,
             y=[c.replace("ESC_", "").title() for c in cols_esc],
-            orientation="h", marker_color="#9467bd",
+            orientation="h", marker_color="#8B5CF6",
             text=textos_esc, textposition="outside",
         ))
         fig = apply_base_layout(fig, height=350)
@@ -438,7 +545,7 @@ def _render_estudo_caso_nivel4(df: pd.DataFrame) -> None:
             labels=["PCD", "Não PCD"],
             values=[pcd, total_el - pcd],
             hole=0.45,
-            marker=dict(colors=["#d62728", "#7f7f7f"]),
+            marker=dict(colors=["#EF4444", "#CBD5E1"]),
             textinfo="percent+value",
         ))
         st.plotly_chart(apply_base_layout(fig, height=350), use_container_width=True)
