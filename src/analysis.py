@@ -22,6 +22,16 @@ STATUS_LABELS: dict[int, str] = {
     4: "Super Crítica",
 }
 
+# Paleta semântica: tons frios/neutros para baixa criticidade → tons quentes/vivos para alta criticidade.
+# Fonte única de verdade — importar em todos os módulos que precisam de cor por status.
+STATUS_PALETTE: dict[int, str] = {
+    0: "#0EA5E9",  # azul-céu  — sem atraso
+    1: "#22C55E",  # verde     — normal
+    2: "#EAB308",  # âmbar     — atenção
+    3: "#F97316",  # laranja   — crítico
+    4: "#EF4444",  # vermelho  — super crítica
+}
+
 
 COLS_LOG: list[str] = [
     "zona", "secao", "modelo", "t_intervalo_s", "n_tit_invalidos",

@@ -67,18 +67,18 @@ DATA_CONFIG: dict[str, dict] = {
 
 # Cores associadas aos níveis de criticidade (para UI / popover)
 STATUS_COLORS: dict[int, str] = {
-    0: "#17a2b8",   # Sem Atraso
-    1: "#28a745",   # Normal
-    2: "#ffc107",   # Atenção
-    3: "#dc3545",   # Crítico
-    4: "#6f1d1b",   # Super Crítica
+    0: "#0EA5E9",  # azul-céu  — sem atraso
+    1: "#22C55E",  # verde     — normal
+    2: "#EAB308",  # âmbar     — atenção
+    3: "#F97316",  # laranja   — crítico
+    4: "#EF4444",  # vermelho  — super crítica
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # CONFIGURAÇÃO DA PÁGINA
 # ═══════════════════════════════════════════════════════════════════════════════
 st.set_page_config(
-    page_title="Urnas Críticas | Dashboard Integrado",
+    page_title="UFS-TRE | Análise de Urnas Eletrônicas",
     page_icon=":round_pushpin:",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -190,7 +190,7 @@ st.markdown("""
         .status-1 { background: #dcfce7; color: #15803d; }
         .status-2 { background: #fef9c3; color: #a16207; }
         .status-3 { background: #fee2e2; color: #991b1b; }
-        .status-4 { background: #f5e6e6; color: #6f1d1b; }
+        .status-4 { background: #fee2e2; color: #B91C1C; }
 
         /* ── Footer ───────────────────────────────────────────────────── */
         .footer {
@@ -260,8 +260,8 @@ def _load_estado_means(nivel_all_path: str) -> dict[str, float]:
 col_title, col_info = st.columns([3, 1])
 with col_title:
     st.markdown("""
-        <div class="main-header">Urnas Críticas · Dashboard Integrado</div>
-        <div class="sub-header">Análise operacional, sociodemográfica e geoespacial por modelo de urna</div>
+        <div class="main-header">UFS · TRE</div>
+        <div class="sub-header">Análise operacional, sociodemográfica e geoespacial das urnas eletrônicas — Eleições Sergipe</div>
     """, unsafe_allow_html=True)
 with col_info:
     st.markdown(f"""
@@ -310,27 +310,32 @@ with fil_col2:
 
         import streamlit.components.v1 as _components
 
+        # (desc, cor, icon, intervalo_minutos)
         _STATUS_DESC = {
-            0: ("Operação fluida, sem atraso significativo.",          "#17a2b8", "✔"),
-            1: ("Atraso leve dentro da margem de tolerância.",         "#28a745", "↑"),
-            2: ("Atraso moderado com pequenas interrupções no fluxo.", "#ffc107", "⚠"),
-            3: ("Atraso considerável com impacto no tempo de espera.", "#dc3545", "✖"),
-            4: ("Atraso severo. Intervenção necessária.",              "#6f1d1b", "‼"),
+            0: ("Operação fluida, sem atraso significativo.",          "#0EA5E9", "✔", "< 6,48 min"),
+            1: ("Atraso leve dentro da margem de tolerância.",         "#22C55E", "↑", "≥ 6,48 min e < 32,15 min"),
+            2: ("Atraso moderado com pequenas interrupções no fluxo.", "#EAB308", "⚠", "≥ 32,15 min e < 89,36 min"),
+            3: ("Atraso considerável com impacto no tempo de espera.", "#F97316", "✖", "≥ 89,36 min e < 150 min"),
+            4: ("Atraso severo. Intervenção necessária.",              "#EF4444", "‼", "≥ 150 min"),
         }
 
         _items_html = ""
         for lvl, label in STATUS_LABELS.items():
-            cor  = _STATUS_DESC[lvl][1]
-            icon = _STATUS_DESC[lvl][2]
-            desc = _STATUS_DESC[lvl][0]
+            cor      = _STATUS_DESC[lvl][1]
+            icon     = _STATUS_DESC[lvl][2]
+            desc     = _STATUS_DESC[lvl][0]
+            intervalo = _STATUS_DESC[lvl][3]
             _items_html += (
                 f'<div style="display:flex;gap:9px;align-items:flex-start;margin-bottom:9px;">'
-                f'  <div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;'
-                f'              background:{cor};color:white;font-size:11px;font-weight:800;'
+                f'  <div style="flex-shrink:0;width:28px;height:28px;border-radius:50%;'
+                f'              background:{cor};color:white;font-size:14px;font-weight:800;'
                 f'              display:flex;align-items:center;justify-content:center;">{lvl}</div>'
                 f'  <div>'
-                f'    <div style="font-size:12px;font-weight:700;color:{cor};margin-bottom:2px;">{icon}&nbsp;{label}</div>'
-                f'    <div style="font-size:11px;color:#6b7280;line-height:1.4;">{desc}</div>'
+                f'    <div style="font-size:14px;font-weight:700;color:{cor};margin-bottom:3px;">{icon}&nbsp;{label}</div>'
+                f'    <div style="font-size:13px;color:#6b7280;line-height:1.4;">{desc}</div>'
+                f'    <div style="font-size:12px;color:#9ca3af;margin-top:3px;'
+                f'                font-family:\'SF Mono\',\'Fira Code\',monospace;letter-spacing:0.01em;">'
+                f'      ⏱ {intervalo}</div>'
                 f'  </div>'
                 f'</div>'
             )
@@ -341,9 +346,9 @@ with fil_col2:
   *{{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif;}}
   body{{background:transparent;overflow:visible;}}
   #btn{{
-    width:28px;height:28px;border-radius:50%;
+    width:40px;height:40px;border-radius:50%;
     background:#ffffff;color:#0f172a;
-    font-size:13px;font-weight:800;line-height:28px;
+    font-size:18px;font-weight:800;line-height:40px;
     text-align:center;cursor:pointer;user-select:none;
     box-shadow:0 2px 8px rgba(15,23,42,0.15);
     transition:background .18s,box-shadow .18s;
@@ -354,9 +359,9 @@ with fil_col2:
   #panel{{
     position:fixed;
     background:#fff;border:1px solid #e2e8f0;border-radius:12px;
-    padding:14px 14px 10px;
+    padding:18px 18px 14px;
     box-shadow:0 12px 40px rgba(15,23,42,0.18);
-    width:272px;z-index:2147483647;
+    width:340px;z-index:2147483647;
     opacity:0;
     transform:translateY(-6px);
     transition:opacity .25s ease, transform .25s ease;
@@ -368,9 +373,9 @@ with fil_col2:
     pointer-events:auto;
   }}
   #title{{
-    font-size:10px;font-weight:700;text-transform:uppercase;
+    font-size:13px;font-weight:700;text-transform:uppercase;
     letter-spacing:.1em;color:#94a3b8;
-    padding-bottom:8px;margin-bottom:10px;
+    padding-bottom:10px;margin-bottom:12px;
     border-bottom:1px solid #f1f5f9;
   }}
   #bar{{height:3px;background:#e2e8f0;border-radius:2px;margin-top:10px;overflow:hidden;}}
@@ -388,8 +393,8 @@ with fil_col2:
   panel = pDoc.createElement('div');
   panel.id = 'crit-panel-legend';
   panel.innerHTML = `
-    <div id="crit-title" style="font-size:10px;font-weight:700;text-transform:uppercase;
-      letter-spacing:.1em;color:#94a3b8;padding-bottom:8px;margin-bottom:10px;
+    <div id="crit-title" style="font-size:13px;font-weight:700;text-transform:uppercase;
+      letter-spacing:.1em;color:#94a3b8;padding-bottom:10px;margin-bottom:12px;
       border-bottom:1px solid #f1f5f9;font-family:Inter,sans-serif;">Níveis de Criticidade</div>
     {_items_html}
     <div style="height:3px;background:#e2e8f0;border-radius:2px;margin-top:10px;overflow:hidden;">
@@ -400,7 +405,7 @@ with fil_col2:
   Object.assign(panel.style, {{
     position:'fixed', zIndex:'2147483647',
     background:'#fff', border:'1px solid #e2e8f0', borderRadius:'12px',
-    padding:'14px 14px 10px', width:'272px',
+    padding:'18px 18px 14px', width:'340px',
     boxShadow:'0 12px 40px rgba(15,23,42,0.18)',
     fontFamily:'Inter,sans-serif',
     opacity:'0', transform:'translateY(-8px)',
@@ -455,7 +460,7 @@ with fil_col2:
     }}
   }});
 </script>
-</body></html>""", height=36, scrolling=False)
+</body></html>""", height=50, scrolling=False)
 
 if 'last_ano' not in st.session_state:
     st.session_state['last_ano'] = ano_selecionado
@@ -594,8 +599,8 @@ gc.collect()
 st.markdown("""
     <div class="footer">
         <div style="font-weight: 600; color: #adb5bd; margin-bottom: 0.25rem;">
-            Sistema de Monitoramento Eleitoral Integrado
+            UFS · TRE — Sistema de Análise de Urnas Eletrônicas
         </div>
-        <div>Dados: TSE / Urnas Eletrônicas | Dashboard desenvolvido com Streamlit</div>
+        <div>Dados: TSE / Urnas Eletrônicas · Eleições Sergipe | Dashboard desenvolvido com Streamlit</div>
     </div>
 """, unsafe_allow_html=True)
