@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from src.analysis import OKABE_ITO, STATUS_LABELS
+from src.analysis import OKABE_ITO, STATUS_LABELS, STATUS_PALETTE
 from src.charts import apply_base_layout
 
 
@@ -20,17 +20,6 @@ def render_tab_criticidade(
     estado_means: dict | None = None,
 ) -> None:
     """Renderiza o conteúdo completo da aba 'Análise por Criticidade'.
-
-    Parâmetros
-    ──────────
-    df_secoes : DataFrame
-        ``analise.df_criticas`` — seções já filtradas pelo nível selecionado.
-    status_filter : int | None
-        Nível de criticidade selecionado globalmente.
-    estado_means : dict | None
-        Médias estaduais globais (todas as seções críticas) para as colunas
-        TIMEOUT_BIOMETRIA, INATIVIDADE e TECLA_INDEVIDA.  Necessário
-        apenas para o "Diagnóstico Detalhado" (status 0–3).
     """
     if df_secoes is None or df_secoes.empty:
         st.error("Dados de seções não disponíveis para este filtro.")
@@ -77,7 +66,7 @@ def _render_visao_geral(df: pd.DataFrame) -> None:
             x=m_timeout.values,
             y=[STATUS_LABELS.get(int(s), f"Nível {int(s)}") for s in m_timeout.index],
             orientation="h",
-            marker_color=OKABE_ITO,
+            marker_color=[STATUS_PALETTE.get(int(s), "#6c757d") for s in m_timeout.index],
             text=text_timeout,
             textposition="outside",
         ))
@@ -107,7 +96,7 @@ def _render_visao_geral(df: pd.DataFrame) -> None:
             x=m_inat.values,
             y=[STATUS_LABELS.get(int(s), f"Nível {int(s)}") for s in m_inat.index],
             orientation="h",
-            marker_color=OKABE_ITO,
+            marker_color=[STATUS_PALETTE.get(int(s), "#6c757d") for s in m_inat.index],
             text=text_inat,
             textposition="outside",
         ))
@@ -129,7 +118,7 @@ def _render_visao_geral(df: pd.DataFrame) -> None:
             labels=[STATUS_LABELS.get(int(s), f"Nível {int(s)}") for s in pcd_sum.index],
             values=pcd_sum.values,
             hole=0.45,
-            marker=dict(colors=OKABE_ITO),
+            marker=dict(colors=[STATUS_PALETTE.get(int(s), "#6c757d") for s in pcd_sum.index]),
         ))
         st.plotly_chart(apply_base_layout(fig, height=350), use_container_width=True)
         del pcd_sum, fig
@@ -145,7 +134,7 @@ def _render_visao_geral(df: pd.DataFrame) -> None:
             x=m_teclas.values,
             y=[STATUS_LABELS.get(int(s), f"Nível {int(s)}") for s in m_teclas.index],
             orientation="h",
-            marker_color=OKABE_ITO,
+            marker_color=[STATUS_PALETTE.get(int(s), "#6c757d") for s in m_teclas.index],
             text=[f"{v:.2f}" for v in m_teclas.values],
             textposition="outside",
         ))
@@ -230,7 +219,7 @@ def _render_detalhamento_nivel(
             x=sums.values,
             y=[c.replace("IDADE_", "").strip() for c in sums.index],
             orientation="h",
-            marker_color="#1b5e20",
+            marker_color=STATUS_PALETTE.get(status_filter, "#0EA5E9"),
         ))
         fig = apply_base_layout(fig, height=400)
         fig.update_layout(yaxis=dict(
@@ -251,7 +240,7 @@ def _render_detalhamento_nivel(
             x=sums_esc.values,
             y=[c.replace("ESC_", "").title() for c in sums_esc.index],
             orientation="h",
-            marker_color="#0d47a1",
+            marker_color=STATUS_PALETTE.get(status_filter, "#0EA5E9"),
         ))
         fig = apply_base_layout(fig, height=400)
         fig.update_layout(yaxis=dict(
@@ -276,7 +265,7 @@ def _render_detalhamento_nivel(
             labels=["PCD", "Não PCD"],
             values=[qtd_pcd, total_votos - qtd_pcd],
             hole=0.45,
-            marker=dict(colors=["#d62728", "#bcbd22"]),
+            marker=dict(colors=["#EF4444", "#CBD5E1"]),
             textinfo="percent+value",
         ))
         st.plotly_chart(apply_base_layout(fig, height=400), use_container_width=True)
@@ -332,8 +321,8 @@ def _render_estudo_caso_nivel4(df: pd.DataFrame) -> None:
     cols_esc   = [c for c in df_sorted.columns if c.startswith("ESC_")]
 
     st.markdown(f"""
-        <div style="background: #f8d7da; padding: 1rem 1.25rem; border-radius: 8px;
-                    border-left: 4px solid #dc3545; margin-bottom: 1.25rem;">
+        <div style="background: #fee2e2; padding: 1rem 1.25rem; border-radius: 8px;
+                    border-left: 4px solid #EF4444; margin-bottom: 1.25rem;">
             <h3 style="color: #721c24; margin-top: 0; font-size: 1.1rem; font-weight: 700;">
                 Prontuário: {urna['NM_MUNICIPIO']} (Z: {urna['NR_ZONA']} | S: {urna['NR_SECAO']})
             </h3>
@@ -366,7 +355,7 @@ def _render_estudo_caso_nivel4(df: pd.DataFrame) -> None:
                 textos.append(f"{int(v)} ocorr.")
         fig = go.Figure(go.Bar(
             x=labels_op, y=valores_op,
-            marker_color=["#ff7f0e", "#1f77b4", "#d62728"],
+            marker_color=["#F97316", "#0EA5E9", "#EF4444"],
             text=textos, textposition="outside",
         ))
         fig = apply_base_layout(fig, height=350)
@@ -392,7 +381,7 @@ def _render_estudo_caso_nivel4(df: pd.DataFrame) -> None:
         fig = go.Figure(go.Bar(
             x=vals_idade,
             y=[c.replace("IDADE_", "").strip() for c in cols_idade],
-            orientation="h", marker_color="#2ca02c",
+            orientation="h", marker_color="#0EA5E9",
             text=textos_idade, textposition="outside",
         ))
         fig = apply_base_layout(fig, height=350)
@@ -418,7 +407,7 @@ def _render_estudo_caso_nivel4(df: pd.DataFrame) -> None:
         fig = go.Figure(go.Bar(
             x=vals_esc,
             y=[c.replace("ESC_", "").title() for c in cols_esc],
-            orientation="h", marker_color="#9467bd",
+            orientation="h", marker_color="#8B5CF6",
             text=textos_esc, textposition="outside",
         ))
         fig = apply_base_layout(fig, height=350)
@@ -438,7 +427,7 @@ def _render_estudo_caso_nivel4(df: pd.DataFrame) -> None:
             labels=["PCD", "Não PCD"],
             values=[pcd, total_el - pcd],
             hole=0.45,
-            marker=dict(colors=["#d62728", "#7f7f7f"]),
+            marker=dict(colors=["#EF4444", "#CBD5E1"]),
             textinfo="percent+value",
         ))
         st.plotly_chart(apply_base_layout(fig, height=350), use_container_width=True)
