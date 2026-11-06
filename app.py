@@ -305,6 +305,7 @@ col_filtros, k1, k2, k3, k4, k5 = st.columns([1.6, 1, 1, 1, 1, 1])
 # ── 1. Renderiza os Filtros ────────────────────────────────────────────────────
 with col_filtros:
     anos_disponiveis = sorted(DATA_CONFIG.keys())
+    print(anos_disponiveis)
     ano_selecionado = st.selectbox("Ano eleitoral", anos_disponiveis, index=len(anos_disponiveis) - 1)
 
     if 'last_ano' not in st.session_state:
