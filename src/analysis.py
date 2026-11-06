@@ -7,10 +7,10 @@ import pandas as pd
 # Constantes compartilhadas
 # ──────────────────────────────────────────────────────────────────────────────
 
-URN_MODELS: list[str] = ["UE2009", "UE2010", "UE2011", "UE2013", "UE2015", "UE2020"]
+URN_MODELS: list[str] = ["UE2009", "UE2010", "UE2011", "UE2013", "UE2015", "UE2020", "UE2022"]
 
 OKABE_ITO: list[str] = [
-    "#0072B2", "#E69F00", "#009E73", "#D55E00", "#CC79A7", "#56B4E9",
+    "#0072B2", "#E69F00", "#009E73", "#D55E00", "#CC79A7", "#56B4E9", "#5600E9"
 ]
 
 MODEL_COLOR: dict[str, str] = dict(zip(URN_MODELS, OKABE_ITO))
