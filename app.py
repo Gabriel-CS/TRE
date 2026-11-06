@@ -62,6 +62,24 @@ DATA_CONFIG: dict[str, dict] = {
             4:    "data/output/modelos_urnas/df_completas_n4_2018.zip",
         },
     },
+    "2026": {
+        "niveis": {
+            "todas as criticas": "data/output/nivel_criticidade/df_criticas_all_2026.csv",
+            0:    "data/output/nivel_criticidade/df_critica_n0_2026.csv",
+            1:    "data/output/nivel_criticidade/df_critica_n1_2026.csv",
+            2:    "data/output/nivel_criticidade/df_critica_n2_2026.csv",
+            3:    "data/output/nivel_criticidade/df_critica_n3_2026.csv",
+            4:    "data/output/nivel_criticidade/df_critica_n4_2026.csv",
+        },
+        "modelos_urnas": {
+            "todas as criticas": "data/output/modelos_urnas/df_completas_all_2026.zip",
+            0:    "data/output/modelos_urnas/df_completas_n0_2026.zip",
+            1:    "data/output/modelos_urnas/df_completas_n1_2026.zip",
+            2:    "data/output/modelos_urnas/df_completas_n2_2026.zip",
+            3:    "data/output/modelos_urnas/df_completas_n3_2026.zip",
+            4:    "data/output/modelos_urnas/df_completas_n4_2026.zip",
+        },
+    },
 }
 
 
