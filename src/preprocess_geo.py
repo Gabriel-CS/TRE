@@ -5,7 +5,7 @@ import geopandas as gpd
 from src.analysis import UrnasCriticasAnalysis  # reutiliza a lógica de criticidade
 
 # Configuração dos anos e níveis
-YEARS = ["2018", "2022"]
+YEARS = ["2018", "2022", "2026"]
 STATUS_LEVELS = [0, 1, 2, 3, 4, None]  # None = todos os críticos (>0)
 
 def preprocess_geo_for_year(year: str):
